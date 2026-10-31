@@ -1,5 +1,32 @@
+# Full stack: docker compose up --build  ->  http://localhost:8080
+# Only the frontend port is meant for the browser; all ports bind to 127.0.0.1.
 services:
-  # Conversation history and document records. Only reachable from this machine.
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env   # NVIDIA_API_KEY etc.; optional
+        required: false
+    environment:
+      DATABASE_URL: postgresql://leagle:${POSTGRES_PASSWORD:-leagle}@db:5432/leagle
+      AZURE_STORAGE_CONNECTION_STRING: >-
+        DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+    ports:
+      - "127.0.0.1:8000:8000"   # API docs at http://localhost:8000/docs
+    depends_on:
+      db:
+        condition: service_healthy
+      azurite:
+        condition: service_started
+
+  # Conversation history and document records.
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -17,8 +44,8 @@ services:
       timeout: 5s
       retries: 10
 
-  # Local Azure Blob Storage emulator; set AZURE_STORAGE_CONNECTION_STRING to use it
-  # (or point the same variable at a real storage account).
+  # Local Azure Blob Storage emulator for uploaded PDFs. To use a real storage
+  # account instead, override AZURE_STORAGE_CONNECTION_STRING for the backend.
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:3.35.0
     restart: unless-stopped

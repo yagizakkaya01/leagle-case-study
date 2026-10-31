@@ -33,3 +33,6 @@ storage/
 Thumbs.db
 .vscode/
 .idea/
+
+# --- Eval run outputs ---
+backend/eval/results/

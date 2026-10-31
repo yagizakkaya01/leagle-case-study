@@ -1,6 +1,7 @@
 """Builds tiny text PDFs in memory so tests need no binary fixtures."""
 from __future__ import annotations
 
+import textwrap
 from pathlib import Path
 
 from app.services.document_store import DocumentStore
@@ -30,8 +31,8 @@ def make_pdf(pages: list[str]) -> bytes:
             f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
             f"/Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>".encode()
         )
-        # "\n" starts a new line; long lines wrap at 80 characters.
-        lines = [p[j:j + 80] for p in text.split("\n") for j in range(0, len(p), 80)]
+        # "\n" starts a new line; long lines wrap at word boundaries like real documents.
+        lines = [w for p in text.split("\n") for w in (textwrap.wrap(p, 90) or [""])]
         ops = ["BT", "/F1 11 Tf", "14 TL", "50 740 Td"]
         for line in lines:
             safe = line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")

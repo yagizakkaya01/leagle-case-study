@@ -69,9 +69,14 @@ docker compose up -d db azurite
 
 ```bash
 cd backend
-pytest -q          # 71 tests; 6 need PostgreSQL/Azurite and are skipped without them
+pytest -q          # 102 tests; 6 need PostgreSQL/Azurite and are skipped without them
 ruff check .
 ```
+
+**Answer quality** is measured separately against the real model with a 30-question gold
+set (`python -m eval`): 30/30 passed, page numbers 25/25 correct, no citations for the 5
+unanswerable questions, a prompt injection in the document ignored. Method, results and
+the limits of that number are in [docs/EVAL.md](docs/EVAL.md).
 
 Chat tests run against a scripted fake chat model. Setting `TEST_DATABASE_URL` and
 `TEST_AZURE_CONNECTION_STRING` (values in `.github/workflows/ci.yml`) also runs the
@@ -244,12 +249,14 @@ backend/
       persistence.py        in-memory or PostgreSQL repository
       file_storage.py       local folder or Azure Blob
   tests/                    pytest suite (fake LLM, in-memory PDFs)
+  eval/                     gold set + runner for the real-model evaluation
 frontend/
   src/
     api/                    REST client, anonymous client id
     components/             UploadPanel, DocumentCard, ChatPanel, ChatMessage,
                             ConversationSidebar
 docs/MODEL_SELECTION.md     why these models, with live measurements
+docs/EVAL.md                answer-quality evaluation against the real model
 docker-compose.yml          frontend, backend, PostgreSQL, Azurite
 ```
 

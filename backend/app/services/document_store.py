@@ -68,7 +68,10 @@ class DocumentStore:
         if existing:
             return existing
 
-        doc = self._build(data, document_id, filename)
+        # Known from an earlier run: reuse its metadata instead of a new LLM call.
+        record = self._repository.get_document(document_id) if self._repository else None
+        known = DocumentMetadata.model_validate(record.metadata) if record else None
+        doc = self._build(data, document_id, filename, known)
         self._files.save(document_id, data)
         if self._repository is not None and doc.chunks:
             self._repository.save_document(DocumentRecord(

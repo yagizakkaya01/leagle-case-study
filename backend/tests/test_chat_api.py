@@ -85,3 +85,30 @@ def test_chat_errors(setup):
     assert client.post("/api/chat", json=_body(doc.document_id)).status_code == 502  # no replies
     app.dependency_overrides[get_chat_service] = lambda: None
     assert client.post("/api/chat", json=_body(doc.document_id)).status_code == 503
+
+
+def test_stream_endpoint_sends_sse_and_saves_conversation(setup):
+    client, doc, llm = setup
+    llm.replies.append(tool_call("FinalAnswer", {"answer": "No mention of salaries.",
+                                                 "found": False}))
+    session = uuid4()
+    res = client.post("/api/chat/stream", json=_body(doc.document_id, session))
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/event-stream")
+    frames = [f for f in res.text.split("\n\n") if f]
+    assert frames[-1].startswith("event: final")
+    assert '"answer": "No mention of salaries."' in frames[-1]
+    listed = client.get("/api/conversations", params={"client_id": "browser-1"}).json()
+    assert [c["session_id"] for c in listed] == [str(session)]
+
+
+def test_stream_endpoint_reports_llm_failure_as_error_event(setup):
+    client, doc, _ = setup  # no scripted replies -> the model call fails
+    res = client.post("/api/chat/stream", json=_body(doc.document_id))
+    assert res.status_code == 200
+    assert res.text.strip().startswith("event: error")
+
+
+def test_stream_endpoint_validates_before_streaming(setup):
+    client, _, _ = setup
+    assert client.post("/api/chat/stream", json=_body("missing")).status_code == 404

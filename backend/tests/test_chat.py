@@ -145,3 +145,41 @@ def test_malformed_final_answer_drops_citation(doc):
     llm = ScriptedChatModel(replies=[bad], seen=[], tool_choices=[])
     answer = ChatService(llm, MemoryRepository().history).ask(doc, "s1", "q")
     assert answer.found is False and answer.page_number is None
+
+
+# --- streaming ------------------------------------------------------------------------
+
+def test_stream_emits_tool_steps_answer_text_and_verified_final(doc):
+    cid = _chunk_id(doc, 2)
+    llm = ScriptedChatModel(replies=[
+        tool_call("search_document", {"query": "termination notice"}),
+        tool_call("FinalAnswer", {"answer": "With ninety days written notice.", "chunk_id": cid,
+                                  "page_number": 9, "reference_text": "ninety days written notice"},
+                  call_id="c2"),
+    ], seen=[], tool_choices=[])
+    chat = ChatService(llm, MemoryRepository().history)
+    events = list(chat.ask_stream(doc, "s1", "How can it be terminated?"))
+
+    kinds = [e["type"] for e in events]
+    assert kinds[0] == "tool" and kinds[-1] == "final"
+    assert events[0]["args"] == {"query": "termination notice"}
+    streamed = "".join(e["text"] for e in events if e["type"] == "delta")
+    assert streamed == "With ninety days written notice."
+    assert kinds.count("delta") > 1  # arrived in pieces
+    final = events[-1]["answer"]
+    assert final.page_number == 2 and final.found is True
+
+
+def test_stream_final_replaces_unverified_streamed_text(doc):
+    llm = ScriptedChatModel(replies=[
+        tool_call("FinalAnswer", {"answer": "Invented clause text.", "chunk_id": "nope"}),
+    ], seen=[], tool_choices=[])
+    events = list(ChatService(llm, MemoryRepository().history).ask_stream(doc, "s1", "q"))
+    assert "Invented" in "".join(e.get("text", "") for e in events)
+    assert events[-1]["answer"].answer == UNVERIFIED_ANSWER
+
+
+def test_stream_raises_when_the_model_fails(doc):
+    llm = ScriptedChatModel(replies=[], seen=[], tool_choices=[])
+    with pytest.raises(IndexError):
+        list(ChatService(llm, MemoryRepository().history).ask_stream(doc, "s1", "q"))

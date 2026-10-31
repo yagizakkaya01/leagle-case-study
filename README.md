@@ -15,7 +15,7 @@ document storage (Azurite locally).
 | **Bonus:** persistent chat history (PostgreSQL via LangChain) | ✅ `PostgresChatMessageHistory`, reloadable from a sidebar |
 | **Bonus:** cloud document storage (Azure Blob) | ✅ Azure Blob SDK; Azurite emulator in Docker |
 | **Bonus:** cloud-backed conversations | ✅ each conversation is bound to its PDF; both reload on click |
-| **Bonus:** streaming responses | ⏳ not yet |
+| **Bonus:** streaming responses | ✅ Server-Sent Events: tool steps live, then the verified answer ([details](#4-streaming)) |
 
 ---
 
@@ -69,7 +69,7 @@ docker compose up -d db azurite
 
 ```bash
 cd backend
-pytest -q          # 56 tests; 4 need PostgreSQL/Azurite and are skipped without them
+pytest -q          # 64 tests; 5 need PostgreSQL/Azurite and are skipped without them
 ruff check .
 ```
 
@@ -164,12 +164,35 @@ UI also lists the tool calls behind each answer ("How this answer was found").
 - After a restart, opening a conversation rebuilds the document from Blob and the
   saved metadata, **without a new LLM call**, and loads the history from PostgreSQL.
 
+### 4. Streaming
+
+`POST /api/chat/stream` returns Server-Sent Events from the same chat chain (the loop
+reports progress through a callback while the chain runs in a worker thread):
+
+```
+event: tool    data: {"name": "search_document", "args": {"query": "termination notice"}}
+event: delta   data: {"text": "Either party may…"}
+event: final   data: {answer, page_number, reference_text, found, tool_calls, elapsed_seconds}
+event: error   data: {"detail": "…"}
+```
+
+The UI shows each step as it happens ("Searching: termination notice") within the first
+seconds, then the answer. `delta` events are parsed from the `FinalAnswer` tool call's
+partial JSON. **Measured limitation:** NVIDIA's hosted endpoint delivers tool-call
+arguments in one piece (the other chunks are reasoning tokens), so with this provider the
+answer text arrives at once; the code streams it word by word with providers that stream
+tool arguments (covered by tests). Plain-text streaming was measured too and was about
+4× slower end to end, and it would give up the structured output. `final` always comes
+last because verification needs the complete answer, so a streamed but unverified
+answer is replaced in the UI.
+
 ## API
 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/documents` | upload a PDF (multipart `file`) → document info + metadata |
 | `POST` | `/api/chat` | `{document_id, session_id, client_id, question}` → `{answer, page_number, reference_text, found, tool_calls, elapsed_seconds}` |
+| `POST` | `/api/chat/stream` | same body; Server-Sent Events (`tool`, `delta`, `final`, `error`) |
 | `GET` | `/api/conversations?client_id=` | saved conversations, newest first |
 | `GET` | `/api/conversations/{id}?client_id=` | document + stored messages with citations |
 | `DELETE` | `/api/conversations/{id}?client_id=` | delete a conversation and its history |

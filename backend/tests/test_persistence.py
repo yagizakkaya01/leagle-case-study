@@ -56,3 +56,26 @@ def test_conversation_and_history_round_trip(repo, tmp_path):
     repo.delete_conversation(conv)
     assert repo.list_conversations(client) == []
     assert repo.history(conv).messages == []
+
+
+def test_reupload_after_restart_reuses_saved_metadata(repo, tmp_path):
+    from langchain_core.runnables import RunnableLambda
+
+    from app.schemas import LlmDocumentFields
+    from app.services.document_store import DocumentStore
+    from app.services.file_storage import LocalFileStorage
+
+    def store_with(extractor):
+        return DocumentStore(LocalFileStorage(tmp_path), chunk_size=200, overlap=40,
+                             max_pages=10, repository=repo, metadata_extractor=extractor)
+
+    calls = []
+    def llm(_):
+        calls.append(1)
+        return LlmDocumentFields(document_type="contract", title="Service Agreement")
+
+    pdf = make_pdf([*PAGES, f"Annex {uuid4()} lists the contact persons of both parties here."])
+    store_with(RunnableLambda(llm)).add(pdf, "agreement.pdf")
+    again = store_with(RunnableLambda(llm)).add(pdf, "agreement.pdf")
+    assert len(calls) == 1
+    assert again.metadata.title == "Service Agreement" and again.metadata.llm_enriched

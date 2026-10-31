@@ -47,7 +47,7 @@ export default function DocumentCard({ doc, onReset, onNewChat }: DocumentCardPr
 
       {meta.summary && <p className="doc-summary">{meta.summary}</p>}
       {!meta.llm_enriched && (
-        <p className="muted small llm-note">Summary and parties unavailable (no LLM configured)</p>
+        <p className="muted small llm-note">Summary and parties unavailable (the language model was not reachable)</p>
       )}
 
       {meta.parties.length > 0 && (

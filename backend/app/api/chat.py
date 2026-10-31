@@ -1,45 +1,84 @@
-"""Chat endpoint: one question about an uploaded document."""
+"""Chat endpoints: one question about an uploaded document, plain or streamed."""
 from __future__ import annotations
 
+import json
+import logging
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_chat_service, get_document_store, get_repository
 from app.schemas import ChatAnswer, ChatRequest
 from app.services.chat import ChatService
-from app.services.document_store import DocumentStore
+from app.services.document_store import DocumentStore, StoredDocument
 from app.services.persistence import Repository
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 TITLE_CHARS = 80
+LLM_FAILED = "The language model did not respond. Please try again."
+
+Store = Annotated[DocumentStore, Depends(get_document_store)]
+Repo = Annotated[Repository, Depends(get_repository)]
+Chat = Annotated[ChatService | None, Depends(get_chat_service)]
 
 
-@router.post("", response_model=ChatAnswer)
-def ask(
-    body: ChatRequest,
-    store: Annotated[DocumentStore, Depends(get_document_store)],
-    repo: Annotated[Repository, Depends(get_repository)],
-    chat: Annotated[ChatService | None, Depends(get_chat_service)],
-) -> ChatAnswer:
+def _prepare(body: ChatRequest, store: DocumentStore, repo: Repository,
+             chat: ChatService | None) -> tuple[ChatService, StoredDocument]:
     if chat is None:
         raise HTTPException(503, "No language model is configured (set NVIDIA_API_KEY).")
     doc = store.get(body.document_id)
     if doc is None:
         raise HTTPException(404, "Document not found. Please upload it again.")
-
-    conversation_id = str(body.session_id)
-    existing = repo.get_conversation(conversation_id)
+    existing = repo.get_conversation(str(body.session_id))
     if existing and (existing.client_id != body.client_id
                      or existing.document_id != body.document_id):
         raise HTTPException(403, "This conversation belongs to another document or user.")
+    return chat, doc
 
-    question = body.question.strip()
+
+def _remember(repo: Repository, body: ChatRequest) -> None:
+    repo.touch_conversation(str(body.session_id), body.client_id, body.document_id,
+                            title=body.question.strip()[:TITLE_CHARS])
+
+
+@router.post("", response_model=ChatAnswer)
+def ask(body: ChatRequest, store: Store, repo: Repo, chat: Chat) -> ChatAnswer:
+    service, doc = _prepare(body, store, repo, chat)
     try:
-        answer = chat.ask(doc, conversation_id, question)
+        answer = service.ask(doc, str(body.session_id), body.question.strip())
     except Exception as exc:
-        raise HTTPException(502, "The language model did not respond. Please try again.") from exc
-    repo.touch_conversation(conversation_id, body.client_id, doc.document_id,
-                            title=question[:TITLE_CHARS])
+        raise HTTPException(502, LLM_FAILED) from exc
+    _remember(repo, body)
     return answer
+
+
+@router.post("/stream")
+def ask_stream(body: ChatRequest, store: Store, repo: Repo, chat: Chat) -> StreamingResponse:
+    """Server-Sent Events: `tool` and `delta` events while working, then `final`
+    (the verified ChatAnswer) or `error`."""
+    service, doc = _prepare(body, store, repo, chat)
+
+    def events() -> Iterator[str]:
+        try:
+            for event in service.ask_stream(doc, str(body.session_id), body.question.strip()):
+                kind = event.pop("type")
+                if kind == "final":
+                    _remember(repo, body)
+                    event = event["answer"].model_dump()
+                yield _sse(kind, event)
+        except Exception:
+            log.warning("Streaming answer failed", exc_info=True)
+            yield _sse("error", {"detail": LLM_FAILED})
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",  # tells nginx not to buffer the stream
+    })
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"

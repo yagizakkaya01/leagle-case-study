@@ -76,12 +76,68 @@ export default function ChatMessage({ entry }: { entry: ChatEntry }) {
 // Three bouncing dots shown while waiting for an answer
 export function TypingIndicator() {
   return (
-    <div className="message bot" aria-label="Waiting for answer">
-      <div className="typing-indicator">
-        <div className="dot" />
-        <div className="dot" />
-        <div className="dot" />
-      </div>
+    <div className="typing-indicator" aria-label="Waiting for answer">
+      <div className="dot" />
+      <div className="dot" />
+      <div className="dot" />
+    </div>
+  );
+}
+
+// Answer still streaming: the tools used so far plus the text received so far
+export interface LiveAnswer {
+  steps: ToolCallInfo[];
+  text: string;
+}
+
+function argText(args: Record<string, unknown>, key: string): string {
+  const value = args[key];
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+// search_document({query: "notice"}) -> "Searching: notice"; unknown tools keep their name
+function describeStep({ name, args }: ToolCallInfo): string {
+  switch (name) {
+    case "search_document":
+      return `Searching: ${argText(args, "query")}`;
+    case "get_page":
+      return `Reading page ${argText(args, "page_number")}`;
+    case "find_clauses":
+      return `Finding clauses: ${argText(args, "category")}`;
+    case "get_document_info":
+      return "Reading document info";
+    default:
+      return name;
+  }
+}
+
+export function LiveMessage({ live }: { live: LiveAnswer }) {
+  const started = live.steps.length > 0 || live.text !== "";
+  return (
+    <div className="message bot" aria-busy="true">
+      {!started && <TypingIndicator />}
+
+      {live.steps.length > 0 && (
+        <ol className="live-steps">
+          {live.steps.map((step, i) => {
+            // The latest step is in progress until answer text starts arriving
+            const active = i === live.steps.length - 1 && live.text === "";
+            return (
+              <li key={i} className={active ? "live-step active" : "live-step"}>
+                {active ? <span className="spinner" aria-hidden="true" /> : <span aria-hidden="true">✓</span>}
+                <span>{describeStep(step)}</span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      {live.text !== "" && (
+        <p className="message-text">
+          {live.text}
+          <span className="stream-cursor" aria-hidden="true" />
+        </p>
+      )}
     </div>
   );
 }

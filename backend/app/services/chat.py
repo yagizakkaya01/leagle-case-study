@@ -7,18 +7,32 @@ Flow per question:
 4. Only the user question and the final answer are written to history (the
    citation rides along in additional_kwargs for the UI); tool traffic stays
    out of memory.
+
+Streaming uses the same chain: the loop reports progress through an `emit`
+callback (tool calls, then the answer text as it arrives) while the chain runs
+in a worker thread; the verified answer is always the last event.
 """
 from __future__ import annotations
 
 import logging
+import queue
+import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.runnables import RunnableLambda
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.utils.json import parse_partial_json
 from pydantic import ValidationError
 
 from app.schemas import ChatAnswer, FinalAnswer, ToolCallInfo
@@ -56,6 +70,7 @@ RULES
 """
 
 HistoryFactory = Callable[[str], BaseChatMessageHistory]
+Emit = Callable[[dict], None]
 
 
 class ChatService:
@@ -69,20 +84,46 @@ class ChatService:
             output_messages_key="answer",
         )
 
-    def ask(self, doc: StoredDocument, conversation_id: str, question: str) -> ChatAnswer:
+    def ask(self, doc: StoredDocument, conversation_id: str, question: str,
+            emit: Emit | None = None) -> ChatAnswer:
         started = time.perf_counter()
         result = self._chain.invoke(
-            {"question": question, "doc": doc},
+            {"question": question, "doc": doc, "emit": emit},
             config={"configurable": {"session_id": conversation_id}},
         )
         answer: ChatAnswer = result["result"]
         answer.elapsed_seconds = round(time.perf_counter() - started, 2)
         return answer
 
+    def ask_stream(self, doc: StoredDocument, conversation_id: str,
+                   question: str) -> Iterator[dict]:
+        """Yields {"type": "tool"|"delta", ...} events, then {"type": "final", "answer"}.
+
+        Raises the chain's exception (after the events seen so far) if it fails.
+        """
+        events: queue.Queue = queue.Queue()
+        done = object()
+
+        def run() -> None:
+            try:
+                answer = self.ask(doc, conversation_id, question, emit=events.put)
+                events.put({"type": "final", "answer": answer})
+            except Exception as exc:  # re-raised in the caller's thread below
+                events.put(exc)
+            finally:
+                events.put(done)
+
+        threading.Thread(target=run, daemon=True).start()
+        while (event := events.get()) is not done:
+            if isinstance(event, Exception):
+                raise event
+            yield event
+
     # --- the agent loop ---------------------------------------------------------
 
     def _answer(self, inputs: dict) -> dict:
         doc: StoredDocument = inputs["doc"]
+        emit: Emit | None = inputs.get("emit")
         evidence = Evidence()
         tools = {t.name: t for t in make_tools(doc, evidence)}
         free = self._llm.bind_tools([*tools.values(), FinalAnswer])
@@ -98,7 +139,7 @@ class ChatService:
 
         for round_number in range(MAX_TOOL_ROUNDS):
             model = forced if round_number == MAX_TOOL_ROUNDS - 1 else free
-            reply: AIMessage = model.invoke(messages)
+            reply = _stream_reply(model, messages, emit) if emit else model.invoke(messages)
             messages.append(reply)
             if not reply.tool_calls:
                 # Plain text without the FinalAnswer tool: shown, but never as grounded.
@@ -109,6 +150,8 @@ class ChatService:
                     final = _parse_final(call["args"])
                     break
                 calls.append(ToolCallInfo(name=call["name"], args=call["args"]))
+                if emit:
+                    emit({"type": "tool", "name": call["name"], "args": call["args"]})
                 messages.append(ToolMessage(
                     content=_run_tool(tools, call["name"], call["args"]),
                     tool_call_id=call["id"],
@@ -137,6 +180,28 @@ class ChatService:
             language=meta.language or "unknown",
             categories=", ".join(CLAUSE_KEYWORDS),
         )
+
+
+def _stream_reply(model, messages: list[BaseMessage], emit: Emit) -> AIMessage:
+    """Streams one model turn, emitting the answer text as soon as it can be read.
+
+    The answer lives in the FinalAnswer tool call's JSON arguments, parsed while
+    still incomplete. Plain content is not streamed: a model may "think aloud"
+    before calling a tool, and that text is not the answer.
+    """
+    reply: AIMessageChunk | None = None
+    sent = ""
+    for chunk in model.stream(messages):
+        reply = chunk if reply is None else reply + chunk
+        text = ""
+        for call in reply.tool_call_chunks:
+            if call.get("name") == FinalAnswer.__name__:
+                partial = parse_partial_json(call.get("args") or "") or {}
+                text = str(partial.get("answer") or "")
+        if text.startswith(sent) and len(text) > len(sent):
+            emit({"type": "delta", "text": text[len(sent):]})
+            sent = text
+    return reply if reply is not None else AIMessage("")
 
 
 def _text_only(history: list[BaseMessage]) -> list[BaseMessage]:

@@ -801,6 +801,75 @@ button:disabled {
   }
 }
 
+/* Live (streaming) answer: tool steps, then the growing text */
+.live-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  white-space: normal;
+}
+
+.live-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+  overflow-wrap: anywhere;
+}
+
+.live-step > :first-child {
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+}
+
+.live-step.active {
+  color: var(--color-text-body);
+}
+
+.spinner {
+  height: 12px;
+  border: 1.5px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--color-accent);
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner,
+  .stream-cursor {
+    animation: none;
+  }
+}
+
 /* Question input bar */
 .chat-input {
   display: flex;

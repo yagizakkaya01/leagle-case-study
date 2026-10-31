@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { askQuestion } from "../api/client";
+import { askQuestionStream } from "../api/client";
 import type { StoredMessage } from "../types";
-import ChatMessage, { TypingIndicator, type ChatEntry } from "./ChatMessage";
+import ChatMessage, { LiveMessage, type ChatEntry, type LiveAnswer } from "./ChatMessage";
 
 const MAX_QUESTION_LENGTH = 1000;
 
@@ -48,14 +48,19 @@ export default function ChatPanel({
   const [messages, setMessages] = useState<ChatEntry[]>(() => toEntries(initialMessages));
   const [input, setInput] = useState("");
   const [isWaiting, setIsWaiting] = useState(false);
+  const [live, setLive] = useState<LiveAnswer | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(initialMessages.length);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Keep the newest message in view
+  // Keep the newest message in view, also while an answer streams in
   useEffect(() => {
     const list = listRef.current;
     if (list) list.scrollTop = list.scrollHeight;
-  }, [messages, isWaiting]);
+  }, [messages, live]);
+
+  // Stop an in-flight stream on unmount (the panel is keyed by session)
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   function append(entry: NewEntry) {
     const withId = { ...entry, id: nextId.current++ } as ChatEntry;
@@ -69,14 +74,37 @@ export default function ChatPanel({
     append({ role: "user", text: question });
     setInput("");
     setIsWaiting(true);
+    setLive({ steps: [], text: "" });
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const answer = await askQuestion(documentId, sessionId, question);
-      append({ role: "assistant", answer });
-      onAnswered?.();
+      await askQuestionStream(
+        documentId,
+        sessionId,
+        question,
+        {
+          onTool: (name, args) =>
+            setLive((prev) => prev && { ...prev, steps: [...prev.steps, { name, args }] }),
+          onDelta: (text) => setLive((prev) => prev && { ...prev, text: prev.text + text }),
+          // The final answer wins over the streamed text (the backend may replace it)
+          onFinal: (answer) => {
+            setLive(null);
+            append({ role: "assistant", answer });
+            onAnswered?.();
+          },
+          onError: (detail) => {
+            setLive(null);
+            append({ role: "error", text: `Error: ${detail}` });
+          },
+        },
+        controller.signal,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       append({ role: "error", text: `Error: ${message}` });
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setLive(null);
       setIsWaiting(false);
     }
   }
@@ -111,7 +139,7 @@ export default function ChatPanel({
         ) : (
           messages.map((entry) => <ChatMessage key={entry.id} entry={entry} />)
         )}
-        {isWaiting && <TypingIndicator />}
+        {live && <LiveMessage live={live} />}
       </div>
 
       <form className="chat-input" onSubmit={handleSubmit}>

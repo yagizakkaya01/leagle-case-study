@@ -46,22 +46,120 @@ export async function uploadDocument(file: File): Promise<DocumentInfo> {
   return (await response.json()) as DocumentInfo;
 }
 
-export async function askQuestion(
+export interface StreamHandlers {
+  onTool: (name: string, args: Record<string, unknown>) => void;
+  onDelta: (text: string) => void; // append to the answer shown so far
+  onFinal: (answer: ChatAnswer) => void; // authoritative; may differ from the streamed text
+  onError: (detail: string) => void;
+}
+
+interface SseFrame {
+  event: string;
+  data: string;
+}
+
+// "event: delta\ndata: {...}" -> {event, data}; repeated data lines are joined with "\n"
+function parseFrame(raw: string): SseFrame | null {
+  let event = "message";
+  const data: string[] = [];
+  for (const line of raw.split("\n")) {
+    const colon = line.indexOf(":");
+    if (colon <= 0) continue; // blank line or ":" comment (keep-alive)
+    const field = line.slice(0, colon);
+    const value = line.slice(colon + 1).replace(/^ /, "");
+    if (field === "event") event = value;
+    else if (field === "data") data.push(value);
+  }
+  return data.length > 0 ? { event, data: data.join("\n") } : null;
+}
+
+// Routes one frame to its handler; returns true once the stream is finished
+function dispatch(frame: SseFrame, handlers: StreamHandlers): boolean {
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(frame.data) as Record<string, unknown>;
+  } catch {
+    return false; // malformed frame: skip it
+  }
+  switch (frame.event) {
+    case "tool":
+      handlers.onTool(String(payload.name), (payload.args ?? {}) as Record<string, unknown>);
+      return false;
+    case "delta":
+      handlers.onDelta(typeof payload.text === "string" ? payload.text : "");
+      return false;
+    case "final":
+      handlers.onFinal(payload as unknown as ChatAnswer);
+      return true;
+    case "error":
+      handlers.onError(typeof payload.detail === "string" ? payload.detail : "Something went wrong.");
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Streams an answer over SSE (POST, so EventSource is not an option).
+// Validation and network errors are thrown; errors during the stream go to onError.
+// An aborted stream returns silently.
+export async function askQuestionStream(
   documentId: string,
   sessionId: string,
   question: string,
-): Promise<ChatAnswer> {
-  const response = await request("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      document_id: documentId,
-      session_id: sessionId,
-      client_id: getClientId(),
-      question,
-    }),
-  });
-  return (await response.json()) as ChatAnswer;
+  handlers: StreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await request("/api/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({
+        document_id: documentId,
+        session_id: sessionId,
+        client_id: getClientId(),
+        question,
+      }),
+      signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) return;
+    throw err;
+  }
+  if (!response.body) {
+    handlers.onError("The connection was interrupted.");
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      // Drop CR so both LF and CRLF line endings split the same way
+      buffer += decoder.decode(value, { stream: !done }).replace(/\r/g, "");
+
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const frame = parseFrame(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + 2);
+        if (frame && dispatch(frame, handlers)) {
+          await reader.cancel();
+          return;
+        }
+        boundary = buffer.indexOf("\n\n");
+      }
+
+      if (done) break;
+    }
+    // A last frame without the trailing blank line
+    const frame = parseFrame(buffer);
+    if (frame && dispatch(frame, handlers)) return;
+  } catch {
+    if (signal?.aborted) return;
+  }
+  handlers.onError("The connection was interrupted.");
 }
 
 export async function listConversations(): Promise<ConversationSummary[]> {

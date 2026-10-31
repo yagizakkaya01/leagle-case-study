@@ -80,8 +80,10 @@ ruff check .
 
 **Answer quality** is measured separately against the real model with a 30-question gold
 set (`python -m eval`): 30/30 passed, page numbers 25/25 correct, no citations for the 5
-unanswerable questions, a prompt injection in the document ignored. Method, results and
-the limits of that number are in [docs/EVAL.md](docs/EVAL.md).
+unanswerable questions, a prompt injection in the document ignored. A second, harder
+set built on reported legal-RAG failure modes exposed two problems that are now fixed
+(superseded terms after amendments; tool calls lost in streamed turns). Method, results,
+speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md).
 
 Chat tests run against a scripted fake chat model. Setting `TEST_DATABASE_URL` and
 `TEST_AZURE_CONNECTION_STRING` (values in `.github/workflows/ci.yml`) also runs the

@@ -6,11 +6,14 @@ path: the same chunking, metadata extraction, hybrid search, tools and citation 
 
 ```bash
 cd backend
-python -m eval                      # needs NVIDIA_API_KEY in backend/.env
+python -m eval                              # basic set, 30 questions (needs NVIDIA_API_KEY)
+python -m eval --set hard --repeat 3        # 12 hard questions, each run 3 times (pass^3)
+python -m eval --set heldout --repeat 3     # 8 held-out questions
 python -m eval --only fact-01,absent-02 --workers 2
 ```
 
-Each run prints the report below and saves every answer to `backend/eval/results/`.
+Each run prints a report and saves every answer to `backend/eval/results/`. There are
+three sets: **basic** (round 1 below), **hard** and **held-out** (round 2).
 
 ## Method
 
@@ -83,3 +86,92 @@ Read the 100% with these in mind:
 - **Keyword scoring** checks facts and pages, not tone, completeness or language quality.
 - **Not covered:** scanned PDFs, long documents (the limit is 50 pages), tables, and
   Turkish-language documents (the PDF generator writes Latin-1 text only).
+
+
+---
+
+# Round 2: hard questions, held-out questions, two fixes
+
+## Why these questions
+
+The hard set follows what the literature reports as the weak points of RAG and
+tool-calling systems, and of legal assistants in particular:
+
+| Source | Finding | Used here as |
+|---|---|---|
+| RAGAS (faithfulness, context precision/recall) | answers must be supported by the retrieved context | answer + page must both be right |
+| Berkeley Function Calling Leaderboard | tool-call accuracy, scored without an LLM judge | tools are recorded per answer |
+| τ-bench | pass^k: a task counts only if it succeeds in all k runs | every hard / held-out question runs 3 times |
+| Magesh et al., *Hallucination-Free?* (Stanford, 2025) | legal AI tools hallucinated in 17–33% of answers; typology *accurate / misgrounded / incorrect / refusal*; causes: naive retrieval, inapplicable (e.g. superseded) authority, reasoning errors, accepting false premises, fabrication | outcome labels as in the paper; one question per cause |
+| LegalBench-RAG | retrieval of the exact passage is the bottleneck in legal RAG | page accuracy; a fact buried in boilerplate |
+| ContractNLI | negation through exceptions is the hardest contract-reasoning case | "can the licensor terminate for convenience?" (only for breach) |
+
+**Hard set** — 12 questions on an 8-page licence with two amendments, an
+order-of-precedence clause, look-alike numbers and three boilerplate pages
+([`gold_hard.py`](../backend/eval/gold_hard.py)): superseded terms, precedence, false
+premise, exceptions, multi-hop arithmetic (150% × the amended fee), distractor numbers,
+a buried fact, party confusion, a non-existent governing-law clause, and a Turkish question
+about the amendment chain.
+
+**Held-out set** — 8 questions on a 6-page distribution agreement with a *Variation
+Agreement*, a *Side Letter* and *notwithstanding / subject to* clauses
+([`gold_heldout.py`](../backend/eval/gold_heldout.py)), written **before** the fix below and
+not used while building it; two control questions ask about terms that were *not* changed.
+
+**Speed** is part of every report: time to the first progress event (what a user waits
+before the UI shows a step), time to the full answer, and tool calls per answer.
+
+## Results
+
+HTTP 4xx responses count as failures (see "streaming bug" below); only timeouts, 429 and
+5xx are reported separately as provider errors.
+
+| Run | Hard set | Held-out | Basic |
+|---|---|---|---|
+| A. before any fix | 33/36 (pass^3 11/12); superseded 3/6 | 23/24 (1 error) | 30/30 ¹ |
+| B. + cross-reference linking | 34/36 (2 errors, both Turkish) | 22/24 (2 errors, Turkish) | 26/30 (4 errors, all Turkish) |
+| C. + streaming fix | 19/19 scored, 17 provider errors (429) | not measured (429) | not measured (429) |
+
+¹ run A of the basic set used the non-streaming path, which did not have the bug.
+
+Speed (run B, hard set): first progress p50 2.4 s / p95 10.8 s; full answer p50 13.9 s /
+p95 34.7 s; 2.5 tool calls per answer (2.0 before the fix, which explains part of the
+extra time).
+
+## What the two fixes were
+
+**1. Superseded terms → cross-reference linking (general, not keyword-based).** In run A,
+"What is the current annual licence fee?" was answered with the original 96,000 euros in
+all three runs; the fee had been raised to 128,000 euros by Amendment No. 1 (page 7). The
+model searched once, found clause 3 and stopped. This is the "inapplicable authority"
+failure from the Stanford study, and the citation check cannot catch it because the quote
+is real.
+
+A keyword rule ("look for the word *amendment*") was rejected as a patch: it would miss
+*Variation Agreement*, *Side Letter*, *Addendum*. Instead, every chunk now records the
+clauses it refers to (`clause 3`, `Section 4.1`, `Article 5`, `Madde 3`), and the search
+tools also return passages linked to the hits by a cross-reference in either direction.
+That covers amendments, side letters and *notwithstanding / subject to* exceptions with
+one mechanism. After the fix the superseded questions passed in every scored run.
+
+**2. A real bug the evaluation exposed: tool calls lost in streamed turns.** Run B showed
+HTTP 400 errors on Turkish questions only. They had first been counted as provider errors,
+which hid them; they are failures. Tracing the request bodies showed the cause:
+`ChatNVIDIA` sends tool calls back to the model only from
+`additional_kwargs["tool_calls"]`, which it fills for `invoke()` but not for streamed
+chunks, so the next request contained a tool result without its call. Streamed turns are
+now rebuilt in the shape of a non-streamed reply (regression test in
+`tests/test_chat.py`). This bug also affected the live UI, which uses streaming.
+
+## Honest reading
+
+- **The held-out set did not discriminate.** Before the fix it already scored 23/24: its
+  variation agreement repeats the old value ("50,000 euros is replaced by 80,000 euros"),
+  so plain search finds it. It still served as a regression check (no drop after the fix,
+  control questions unchanged), but it is not evidence that the fix generalises.
+- **The hard-set improvement is on a question that was seen** when designing the fix, so
+  it is not a held-out result either.
+- **Run C is incomplete.** The free NVIDIA endpoint started returning 429 after a long
+  series of evaluation runs on one key; the remaining answers were not scored rather than
+  counted as wrong. Re-running all three sets is the open item.
+- Same caveats as round 1: small, synthetic, single author, keyword scoring.

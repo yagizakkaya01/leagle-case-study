@@ -10,11 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 from langchain_core.runnables import Runnable
 
 from app.schemas import DocumentMetadata
 from app.services.document_metadata import extract_metadata
 from app.services.pdf_processing import process_pdf
+from app.services.search_index import SearchIndex
 
 
 @dataclass
@@ -25,6 +27,7 @@ class StoredDocument:
     chunks: list[Document]
     empty_pages: list[int]
     metadata: DocumentMetadata
+    index: SearchIndex
 
     @property
     def page_count(self) -> int:
@@ -40,12 +43,14 @@ class DocumentStore:
         overlap: int,
         max_pages: int,
         metadata_extractor: Runnable | None = None,
+        embeddings: Embeddings | None = None,
     ):
         self._dir = storage_dir
         self._chunk_size = chunk_size
         self._overlap = overlap
         self._max_pages = max_pages
         self._extractor = metadata_extractor
+        self._embeddings = embeddings
         self._documents: dict[str, StoredDocument] = {}
         self._lock = threading.Lock()
 
@@ -77,6 +82,7 @@ class DocumentStore:
             chunks=processed.chunks,
             empty_pages=processed.empty_pages,
             metadata=metadata or DocumentMetadata(),
+            index=SearchIndex(processed.chunks, self._embeddings),
         )
         with self._lock:
             self._documents[document_id] = doc

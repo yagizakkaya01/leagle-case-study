@@ -52,6 +52,7 @@ export default function UploadPanel({ onUploaded }: UploadPanelProps) {
 
   return (
     <form className="card upload-panel" onSubmit={handleSubmit}>
+      <span className="eyebrow">01 · Upload</span>
       <h2>Upload a PDF</h2>
       <p className="muted">Choose a single PDF (max {MAX_FILE_SIZE_MB} MB) to start chatting with it.</p>
 

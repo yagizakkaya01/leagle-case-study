@@ -39,9 +39,14 @@ export default function DocumentCard({ doc, onReset }: DocumentCardProps) {
         {meta.title && meta.title !== doc.filename && <p className="muted small">{doc.filename}</p>}
       </div>
 
-      {meta.summary && <p>{meta.summary}</p>}
+      <p className="callout callout-success">
+        <span className="status-label">Indexed</span>
+        Ready for questions
+      </p>
+
+      {meta.summary && <p className="doc-summary">{meta.summary}</p>}
       {!meta.llm_enriched && (
-        <p className="muted small">Summary and parties unavailable (no LLM configured)</p>
+        <p className="muted small llm-note">Summary and parties unavailable (no LLM configured)</p>
       )}
 
       {meta.parties.length > 0 && (
@@ -112,10 +117,10 @@ export default function DocumentCard({ doc, onReset }: DocumentCardProps) {
       )}
 
       {doc.empty_pages.length > 0 && (
-        <p className="warning">No extractable text on pages: {doc.empty_pages.join(", ")}</p>
+        <p className="callout warning">No extractable text on pages: {doc.empty_pages.join(", ")}</p>
       )}
 
-      <button type="button" onClick={onReset}>
+      <button type="button" className="btn-secondary" onClick={onReset}>
         Upload another PDF
       </button>
     </section>

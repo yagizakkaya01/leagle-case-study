@@ -5,10 +5,11 @@ metadata only) and tests never hit the network.
 """
 from __future__ import annotations
 
+from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers.openai_tools import PydanticToolsParser
 from langchain_core.runnables import Runnable
-from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from langchain_nvidia_ai_endpoints import ChatNVIDIA, NVIDIAEmbeddings
 from pydantic import BaseModel
 
 from app.config import settings
@@ -27,6 +28,16 @@ def get_chat_model() -> BaseChatModel | None:
         timeout=settings.LLM_TIMEOUT_SECONDS,
         usage_telemetry_enabled=False,
         model_kwargs={"reasoning_effort": effort} if effort else {},
+    )
+
+
+def get_embeddings() -> Embeddings | None:
+    if not settings.NVIDIA_API_KEY:
+        return None
+    return NVIDIAEmbeddings(
+        model=settings.NVIDIA_EMBED_MODEL,
+        api_key=settings.NVIDIA_API_KEY,
+        truncate="END",  # chunks are short; never fail on an over-long one
     )
 
 

@@ -47,3 +47,17 @@ export interface DocumentInfo {
   empty_pages: number[]; // 1-based pages with no extractable text
   metadata: DocumentMetadata;
 }
+
+export interface ToolCallInfo {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface ChatAnswer {
+  answer: string;
+  page_number: number | null; // 1-based, verified by backend
+  reference_text: string | null; // short quote from the document, verified
+  found: boolean; // false when the document does not contain the answer
+  tool_calls: ToolCallInfo[]; // tools the model used, in order
+  elapsed_seconds: number;
+}

@@ -57,3 +57,38 @@ class DocumentInfo(BaseModel):
     chunk_count: int
     empty_pages: list[int]
     metadata: DocumentMetadata
+
+
+# --- Chat ---------------------------------------------------------------------
+
+class FinalAnswer(BaseModel):
+    """Call exactly once to give the final answer to the user."""
+
+    answer: str = Field(description="Concise answer in the user's language")
+    # Defaults to True: grounding.verify() still demands a real chunk_id behind it.
+    found: bool = Field(True, description="False when the document does not contain the answer")
+    chunk_id: str | None = Field(None, description="chunk_id of the chunk that supports it")
+    page_number: int | None = Field(None, description="Page of that chunk")
+    reference_text: str | None = Field(
+        None, description="Short exact quote (max ~40 words) copied from that chunk"
+    )
+
+
+class ChatRequest(BaseModel):
+    document_id: str
+    session_id: str = Field(min_length=1, max_length=100)
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class ToolCallInfo(BaseModel):
+    name: str
+    args: dict
+
+
+class ChatAnswer(BaseModel):
+    answer: str
+    page_number: int | None
+    reference_text: str | None
+    found: bool
+    tool_calls: list[ToolCallInfo] = Field(default_factory=list)
+    elapsed_seconds: float = 0.0

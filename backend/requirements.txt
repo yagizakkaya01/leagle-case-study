@@ -10,6 +10,10 @@ pydantic-settings~=2.16
 # --- PDF processing ---
 pdfplumber~=0.11.10
 
+# --- Search ---
+rank-bm25~=0.2.2
+rapidfuzz~=3.14
+
 # --- LangChain ---
 langchain-core~=1.7
 langchain-nvidia-ai-endpoints~=1.5

@@ -1,4 +1,4 @@
-import type { DocumentInfo } from "../types";
+import type { ChatAnswer, DocumentInfo } from "../types";
 
 const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -30,4 +30,26 @@ export async function uploadDocument(file: File): Promise<DocumentInfo> {
     throw await toError(response);
   }
   return (await response.json()) as DocumentInfo;
+}
+
+export async function askQuestion(
+  documentId: string,
+  sessionId: string,
+  question: string,
+): Promise<ChatAnswer> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: documentId, session_id: sessionId, question }),
+    });
+  } catch {
+    throw new Error("Could not reach the server. Is the backend running?");
+  }
+
+  if (!response.ok) {
+    throw await toError(response);
+  }
+  return (await response.json()) as ChatAnswer;
 }

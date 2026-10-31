@@ -88,3 +88,117 @@ button:disabled {
   border: 2px dashed #cbd2d9;
   border-radius: 8px;
 }
+
+/* Document card: metadata extracted after upload */
+.document-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.doc-header,
+.doc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.badges,
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Pill badge, adapted from YA-cilekAI .network-badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3e4c59;
+  background: rgba(128, 128, 128, 0.1);
+  border-radius: 12px;
+}
+
+.badge-type {
+  color: #2f5fd0;
+  background: #e8eefc;
+}
+
+.doc-stats {
+  font-size: 0.85rem;
+}
+
+/* Section label, adapted from kervansaray table header style */
+.section-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #616e7c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.doc-list {
+  margin: 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+
+/* Square tag, adapted from YA-cilekAI .source-tag */
+.source-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #555;
+  background: #f0f0f5;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+/* Rounded chip, adapted from YA-cilekAI .quick-chip (non-interactive here) */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #52606d;
+  background: #fff;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 20px;
+}
+
+.chip-count {
+  min-width: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  text-align: center;
+  color: #fff;
+  background: #2f5fd0;
+  border-radius: 9px;
+}
+
+.doc-outline {
+  width: 100%;
+}
+
+.doc-outline summary {
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.doc-outline .doc-list {
+  margin-top: 6px;
+}

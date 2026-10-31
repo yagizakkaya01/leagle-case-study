@@ -1,0 +1,139 @@
+"""Rule-based metadata for chunks: section headings, clause categories, flags.
+
+No LLM is involved, so every value here is deterministic and cheap; the tool
+layer filters on these fields instead of trusting the model to find them.
+"""
+from __future__ import annotations
+
+import re
+
+from app.services.text_normalize import normalize_whitespace, to_ascii
+
+# --- Headings -----------------------------------------------------------------
+# Each pattern captures the clause number in group "num".
+_HEADING_PATTERNS = [
+    re.compile(r"^(?:madde|article|section|bolum|clause)\s+(?P<num>\d+(?:\.\d+)*|[ivxlc]+)\b"),
+    re.compile(r"^(?P<num>\d+(?:\.\d+)*)[.)]?\s+\S"),
+]
+_MAX_HEADING_CHARS = 90
+_MAX_HEADING_WORDS = 12
+
+
+def parse_heading(line: str, *, large_font: bool = False) -> tuple[str, str | None] | None:
+    """Returns (heading, clause_number) when the line looks like a heading.
+
+    `large_font` marks a line set in a bigger font than the body text, which is
+    how many documents show headings that have no number or capitals.
+    """
+    line = normalize_whitespace(line)
+    if not line or len(line) > _MAX_HEADING_CHARS or len(line.split()) > _MAX_HEADING_WORDS:
+        return None
+
+    folded = to_ascii(line)
+    for pattern in _HEADING_PATTERNS:
+        match = pattern.match(folded)
+        if match:
+            # Numbered list items usually end with a full stop; headings do not.
+            if pattern is _HEADING_PATTERNS[1] and line.endswith((".", ";", ",")):
+                return None
+            return line, match.group("num")
+
+    letters = [c for c in line if c.isalpha()]
+    if large_font or (len(letters) >= 4 and all(c.isupper() for c in letters)):
+        return line, None
+    return None
+
+
+# --- Clause categories ----------------------------------------------------------
+# Keywords are matched on `to_ascii` text, so Turkish ones are written without
+# Turkish letters. Heading hits count double: a heading names the clause.
+CLAUSE_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "definitions": ("definition", "tanim", "means", "ifade eder"),
+    "payment": ("payment", "fee", "price", "rent", "invoice", "odeme", "ucret", "bedel",
+                "kira bedeli", "fatura"),
+    "term_duration": ("term of", "duration", "commencement", "sure", "yururluk"),
+    "termination": ("terminat", "fesih", "feshi", "sona erme", "sona erer"),
+    "obligations": ("obligation", "shall perform", "yukumluluk", "borclari", "taahhut"),
+    "confidentiality": ("confidential", "non-disclosure", "gizlilik", "sir saklama"),
+    "liability_indemnity": ("liabilit", "indemn", "damages", "sorumluluk", "tazminat",
+                            "zarar"),
+    "force_majeure": ("force majeure", "act of god", "mucbir sebep"),
+    "governing_law": ("governing law", "applicable law", "uygulanacak hukuk",
+                      "governed by", "laws of", "hukuku uygulan"),
+    "dispute_resolution": ("dispute", "arbitration", "jurisdiction", "court", "uyusmazlik",
+                           "tahkim", "yetkili mahkeme", "icra daire"),
+    "intellectual_property": ("intellectual property", "copyright", "trademark", "patent",
+                              "fikri mulkiyet", "telif"),
+    "data_protection": ("personal data", "gdpr", "data protection", "kisisel veri", "kvkk"),
+}
+OTHER = "other"
+
+# Keywords match at a word start ("terminat" hits "termination", "sure" misses "ensure").
+_KEYWORD_RES = {
+    category: [re.compile(rf"\b{re.escape(k)}") for k in keywords]
+    for category, keywords in CLAUSE_KEYWORDS.items()
+}
+
+
+def classify_clause(heading: str | None, text: str) -> str:
+    heading_folded = to_ascii(heading or "")
+    text_folded = to_ascii(text)
+    best, best_score = OTHER, 0
+    for category, patterns in _KEYWORD_RES.items():
+        score = sum(2 for p in patterns if p.search(heading_folded))
+        score += sum(1 for p in patterns if p.search(text_folded))
+        if score > best_score:
+            best, best_score = category, score
+    # A single keyword in body text is too weak a signal on its own.
+    return best if best_score >= 2 else OTHER
+
+
+# --- Flags and terms --------------------------------------------------------------
+_AMOUNT = re.compile(
+    r"(?:[$€£₺]\s?\d)|(?:\d[\d.,]*\s?(?:tl|try|usd|eur|euro|euros|gbp|dollars?|lira|"
+    r"pounds?)\b)|(?:\b(?:euros?|dollars?|lira)\b)",
+    re.IGNORECASE,
+)
+_MONTHS = (
+    "january|february|march|april|may|june|july|august|september|october|november|december|"
+    "ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik"
+)
+_DATE = re.compile(
+    rf"\b\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{2,4}}\b|\b\d{{4}}-\d{{2}}-\d{{2}}\b|"
+    rf"\b\d{{1,2}}\s+(?:{_MONTHS})\s+\d{{4}}\b|\b(?:{_MONTHS})\s+\d{{1,2}},?\s+\d{{4}}\b"
+)
+# "Tenant", “Kiracı” - quoted terms starting with a capital letter.
+_DEFINED_TERM = re.compile(r"[\"“]([A-ZÇĞİÖŞÜ][\wçğıöşüÇĞİÖŞÜ\- ]{1,40}?)[\"”]")
+
+
+def has_amount(text: str) -> bool:
+    return bool(_AMOUNT.search(text))
+
+
+def has_date(text: str) -> bool:
+    return bool(_DATE.search(to_ascii(text)))
+
+
+def defined_terms(text: str) -> list[str]:
+    return sorted({m.strip() for m in _DEFINED_TERM.findall(text)})
+
+
+# --- Turkish court case numbers ---------------------------------------------------
+# "Esas No: 2022/16696", "2022/16696 E.", "Karar No : 2024/1755", "2024/1755 K."
+_CASE_NUMBER = re.compile(
+    r"(?:esas\s*(?:no)?\s*[:.]?\s*(?P<e1>\d{4}/\d+))|(?P<e2>\d{4}/\d+)\s*e\.|"
+    r"(?:karar\s*(?:no)?\s*[:.]?\s*(?P<k1>\d{4}/\d+))|(?P<k2>\d{4}/\d+)\s*k\.",
+    re.IGNORECASE,
+)
+_CASE_NUMBER_EN = re.compile(r"\bcase\s+no\.?\s*[:]?\s*([\w/.\-]+\d)", re.IGNORECASE)
+
+
+def case_numbers(text: str) -> list[str]:
+    found: list[str] = []
+    for m in _CASE_NUMBER.finditer(to_ascii(text)):
+        if m.group("e1") or m.group("e2"):
+            found.append(f"{m.group('e1') or m.group('e2')} E.")
+        else:
+            found.append(f"{m.group('k1') or m.group('k2')} K.")
+    found.extend(f"Case No. {n}" for n in _CASE_NUMBER_EN.findall(text))
+    return list(dict.fromkeys(found))  # de-duplicate, keep order

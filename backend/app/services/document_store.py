@@ -1,4 +1,4 @@
-"""Keeps uploaded PDFs and their processed chunks.
+"""Keeps uploaded PDFs, their processed chunks and metadata.
 
 Files go to a local folder for now; the registry lives in process memory.
 """
@@ -10,7 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from langchain_core.documents import Document
+from langchain_core.runnables import Runnable
 
+from app.schemas import DocumentMetadata
+from app.services.document_metadata import extract_metadata
 from app.services.pdf_processing import process_pdf
 
 
@@ -18,17 +21,31 @@ from app.services.pdf_processing import process_pdf
 class StoredDocument:
     document_id: str
     filename: str
-    page_count: int
+    pages: list[str]
     chunks: list[Document]
     empty_pages: list[int]
+    metadata: DocumentMetadata
+
+    @property
+    def page_count(self) -> int:
+        return len(self.pages)
 
 
 class DocumentStore:
-    def __init__(self, storage_dir: Path, *, chunk_size: int, overlap: int, max_pages: int):
+    def __init__(
+        self,
+        storage_dir: Path,
+        *,
+        chunk_size: int,
+        overlap: int,
+        max_pages: int,
+        metadata_extractor: Runnable | None = None,
+    ):
         self._dir = storage_dir
         self._chunk_size = chunk_size
         self._overlap = overlap
         self._max_pages = max_pages
+        self._extractor = metadata_extractor
         self._documents: dict[str, StoredDocument] = {}
         self._lock = threading.Lock()
 
@@ -48,15 +65,18 @@ class DocumentStore:
             overlap=self._overlap,
             max_pages=self._max_pages,
         )
+        metadata = extract_metadata(processed, self._extractor) if processed.chunks else None
+
         self._dir.mkdir(parents=True, exist_ok=True)
         (self._dir / f"{document_id}.pdf").write_bytes(data)
 
         doc = StoredDocument(
             document_id=document_id,
             filename=filename,
-            page_count=processed.page_count,
+            pages=processed.pages,
             chunks=processed.chunks,
             empty_pages=processed.empty_pages,
+            metadata=metadata or DocumentMetadata(),
         )
         with self._lock:
             self._documents[document_id] = doc

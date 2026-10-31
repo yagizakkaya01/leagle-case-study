@@ -42,4 +42,5 @@ def upload_document(
         page_count=doc.page_count,
         chunk_count=len(doc.chunks),
         empty_pages=doc.empty_pages,
+        metadata=doc.metadata,
     )

@@ -4,6 +4,7 @@ from app.services.pdf_processing import (
     PdfProcessingError,
     is_valid_chunk,
     process_pdf,
+    split_into_sections,
     split_text,
 )
 from tests.pdf_factory import make_pdf
@@ -46,7 +47,22 @@ def test_process_pdf_keeps_page_numbers_and_reports_empty_pages():
     assert result.empty_pages == [1]
     assert [c.metadata["page"] for c in result.chunks] == [2, 3]
     assert "monthly rent" in result.chunks[0].page_content
-    assert result.chunks[0].metadata == {"document_id": "doc1", "filename": "lease.pdf", "page": 2}
+    meta = result.chunks[0].metadata
+    assert meta["chunk_id"] == "doc1-p2-c0"
+    assert (meta["document_id"], meta["filename"], meta["page"]) == ("doc1", "lease.pdf", 2)
+    assert meta["has_amount"] is True
+    assert result.pages[1].startswith("The Tenant")
+
+
+def test_sections_split_at_headings_and_carry_over_pages():
+    page1 = "MADDE 4 - FESİH\nTaraflardan her biri bu sözleşmeyi otuz gün önceden yazılı bildirimle"
+    page2 = "feshedebilir ve fesih halinde kiracı taşınmazı boş olarak teslim etmekle yükümlüdür."
+    sections = split_into_sections([page1, page2])
+    assert [(s.page, s.heading, s.clause_number) for s in sections] == [
+        (1, "MADDE 4 - FESİH", "4"),
+        (2, "MADDE 4 - FESİH", "4"),
+    ]
+    assert sections[1].lines == [page2]
 
 
 def test_process_pdf_rejects_too_many_pages():

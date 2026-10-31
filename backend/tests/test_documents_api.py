@@ -29,6 +29,8 @@ def test_upload_returns_document_info(client):
     assert body["chunk_count"] == 1
     assert body["empty_pages"] == [2]
     assert len(body["document_id"]) == 64
+    assert body["metadata"]["llm_enriched"] is False
+    assert body["metadata"]["document_type"] == "other"
 
 
 def test_same_file_gets_same_id(client):

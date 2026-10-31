@@ -39,6 +39,12 @@ export interface DocumentMetadata {
   llm_enriched: boolean; // false when no LLM key: only rule-based fields filled
 }
 
+export interface PublicSettings {
+  demo_notice: string | null;
+  retention_hours: number | null;
+  max_upload_mb: number;
+}
+
 export interface DocumentInfo {
   document_id: string; // sha256 of the file
   filename: string;

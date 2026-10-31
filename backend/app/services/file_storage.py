@@ -22,6 +22,9 @@ class FileStorage(ABC):
     @abstractmethod
     def load(self, document_id: str) -> bytes | None: ...
 
+    @abstractmethod
+    def delete(self, document_id: str) -> None: ...
+
 
 class LocalFileStorage(FileStorage):
     def __init__(self, directory: Path):
@@ -34,6 +37,9 @@ class LocalFileStorage(FileStorage):
     def load(self, document_id: str) -> bytes | None:
         path = self._path(document_id)
         return path.read_bytes() if path.exists() else None
+
+    def delete(self, document_id: str) -> None:
+        self._path(document_id).unlink(missing_ok=True)
 
     def _path(self, document_id: str) -> Path:
         return self._dir / f"{document_id}.pdf"
@@ -60,6 +66,12 @@ class AzureBlobStorage(FileStorage):
             return self._container.download_blob(f"{document_id}.pdf").readall()
         except ResourceNotFoundError:
             return None
+
+    def delete(self, document_id: str) -> None:
+        try:
+            self._container.delete_blob(f"{document_id}.pdf")
+        except ResourceNotFoundError:
+            pass
 
 
 def build_file_storage(azure_connection_string: str, container: str,

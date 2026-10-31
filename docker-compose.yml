@@ -16,6 +16,7 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql://leagle:${POSTGRES_PASSWORD:-leagle}@db:5432/leagle
+      TRUSTED_PROXY_HOPS: "1"   # requests arrive through the frontend's nginx
       AZURE_STORAGE_CONNECTION_STRING: >-
         DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
     ports:

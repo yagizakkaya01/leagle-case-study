@@ -8,8 +8,10 @@ LLM again.
 from __future__ import annotations
 
 import hashlib
+import logging
 import threading
 from dataclasses import dataclass
+from datetime import datetime
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
@@ -21,6 +23,8 @@ from app.services.file_storage import FileStorage
 from app.services.pdf_processing import process_pdf
 from app.services.persistence import DocumentRecord, Repository
 from app.services.search_index import SearchIndex
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -96,6 +100,20 @@ class DocumentStore:
         with self._lock:
             self._documents[document_id] = doc
         return doc
+
+    def purge_older_than(self, cutoff: datetime) -> int:
+        """Deletes documents uploaded before `cutoff` with their files and chats."""
+        if self._repository is None:
+            return 0
+        expired = self._repository.documents_older_than(cutoff)
+        for document_id in expired:
+            self._repository.delete_document(document_id)
+            self._files.delete(document_id)
+            with self._lock:
+                self._documents.pop(document_id, None)
+        if expired:
+            log.info("Retention: deleted %d expired document(s)", len(expired))
+        return len(expired)
 
     def _build(self, data: bytes, document_id: str, filename: str,
                metadata: DocumentMetadata | None = None) -> StoredDocument:

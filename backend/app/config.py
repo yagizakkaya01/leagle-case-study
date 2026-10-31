@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     LLM_REASONING_EFFORT: str = "low"  # "low" | "medium" | "high"; empty = model default
     LLM_TIMEOUT_SECONDS: float = 60.0
 
+    # --- Public demo safeguards ---
+    CHAT_LIMIT_PER_HOUR: int = 60      # per client IP; 0 = unlimited
+    UPLOAD_LIMIT_PER_HOUR: int = 20    # per client IP; 0 = unlimited
+    TRUSTED_PROXY_HOPS: int = 0        # reverse proxies in front (nginx = 1, Caddy + nginx = 2)
+    RETENTION_HOURS: int = 0           # delete documents + their chats after N hours; 0 = keep
+    DEMO_NOTICE: str = ""              # banner text shown in the UI; empty = no banner
+
     # --- Logging ---
     LOG_LEVEL: str = "INFO"
 

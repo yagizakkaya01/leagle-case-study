@@ -9,7 +9,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.dependencies import get_chat_service, get_document_store, get_repository
+from app.dependencies import (
+    enforce_chat_limit,
+    get_chat_service,
+    get_document_store,
+    get_repository,
+)
 from app.schemas import ChatAnswer, ChatRequest
 from app.services.chat import ChatService
 from app.services.document_store import DocumentStore, StoredDocument
@@ -45,7 +50,7 @@ def _remember(repo: Repository, body: ChatRequest) -> None:
                             title=body.question.strip()[:TITLE_CHARS])
 
 
-@router.post("", response_model=ChatAnswer)
+@router.post("", response_model=ChatAnswer, dependencies=[Depends(enforce_chat_limit)])
 def ask(body: ChatRequest, store: Store, repo: Repo, chat: Chat) -> ChatAnswer:
     service, doc = _prepare(body, store, repo, chat)
     try:
@@ -56,7 +61,7 @@ def ask(body: ChatRequest, store: Store, repo: Repo, chat: Chat) -> ChatAnswer:
     return answer
 
 
-@router.post("/stream")
+@router.post("/stream", dependencies=[Depends(enforce_chat_limit)])
 def ask_stream(body: ChatRequest, store: Store, repo: Repo, chat: Chat) -> StreamingResponse:
     """Server-Sent Events: `tool` and `delta` events while working, then `final`
     (the verified ChatAnswer) or `error`."""

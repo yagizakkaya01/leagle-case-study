@@ -1,9 +1,4 @@
-import type {
-  ChatAnswer,
-  ConversationDetail,
-  ConversationSummary,
-  DocumentInfo,
-} from "../types";
+import type { ChatAnswer, ConversationDetail, ConversationSummary, DocumentInfo, PublicSettings } from "../types";
 import { getClientId } from "./clientId";
 
 const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -160,6 +155,11 @@ export async function askQuestionStream(
     if (signal?.aborted) return;
   }
   handlers.onError("The connection was interrupted.");
+}
+
+export async function getPublicSettings(): Promise<PublicSettings> {
+  const response = await request("/api/settings");
+  return (await response.json()) as PublicSettings;
 }
 
 export async function listConversations(): Promise<ConversationSummary[]> {

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { getConversation } from "./api/client";
 import ChatPanel from "./components/ChatPanel";
 import ConversationSidebar from "./components/ConversationSidebar";
+import DemoBanner from "./components/DemoBanner";
 import DocumentCard from "./components/DocumentCard";
 import UploadPanel from "./components/UploadPanel";
 import type { DocumentInfo, StoredMessage } from "./types";
@@ -85,6 +86,7 @@ export default function App() {
           </button>
         </div>
       </header>
+      <DemoBanner />
 
       <div className="app-body">
         <ConversationSidebar

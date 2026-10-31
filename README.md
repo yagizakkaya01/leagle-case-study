@@ -69,7 +69,7 @@ docker compose up -d db azurite
 
 ```bash
 cd backend
-pytest -q          # 64 tests; 5 need PostgreSQL/Azurite and are skipped without them
+pytest -q          # 71 tests; 6 need PostgreSQL/Azurite and are skipped without them
 ruff check .
 ```
 
@@ -196,6 +196,7 @@ answer is replaced in the UI.
 | `GET` | `/api/conversations?client_id=` | saved conversations, newest first |
 | `GET` | `/api/conversations/{id}?client_id=` | document + stored messages with citations |
 | `DELETE` | `/api/conversations/{id}?client_id=` | delete a conversation and its history |
+| `GET` | `/api/settings` | demo banner text, retention, upload limit for the UI |
 | `GET` | `/healthz` | liveness |
 
 Interactive docs: `/docs`.
@@ -215,6 +216,10 @@ All settings live in `backend/.env` (see [`.env.example`](backend/.env.example))
 | `AZURE_STORAGE_CONNECTION_STRING` | empty | Azure Blob (or Azurite) for PDF files |
 | `MAX_UPLOAD_MB` / `MAX_PAGES` | `10` / `50` | upload limits |
 | `CORS_ORIGINS` | `http://localhost:5173` | allowed frontend origins in development |
+| `CHAT_LIMIT_PER_HOUR` / `UPLOAD_LIMIT_PER_HOUR` | `60` / `20` | per client IP; `0` = unlimited |
+| `TRUSTED_PROXY_HOPS` | `0` (`1` in Docker) | reverse proxies in front, used to read the real client IP |
+| `RETENTION_HOURS` | `0` | delete documents and their chats after N hours; `0` = keep |
+| `DEMO_NOTICE` | empty | banner text shown in the UI (public demo) |
 
 ## Project structure
 
@@ -268,6 +273,17 @@ docker-compose.yml          frontend, backend, PostgreSQL, Azurite
 - **Model choice** is documented with live measurements in
   [docs/MODEL_SELECTION.md](docs/MODEL_SELECTION.md): Mistral Large 4 on NVIDIA's free
   endpoint, Gemma 4 31B as the tested alternative.
+
+### Public demo safeguards
+
+The same code runs locally and as a public demo; only configuration differs.
+
+- **Rate limits** per client IP (sliding window, in memory) on questions and uploads.
+  Behind proxies the real IP is read from `X-Forwarded-For`, counting
+  `TRUSTED_PROXY_HOPS` entries from the right, so a client cannot spoof it.
+- **Retention:** with `RETENTION_HOURS` set, a background task deletes expired
+  documents, their files in Blob storage and all conversations about them.
+- **Banner:** `DEMO_NOTICE` asks visitors not to upload confidential documents.
 
 ### Deliberately left out
 

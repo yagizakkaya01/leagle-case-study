@@ -8,7 +8,7 @@ Two interchangeable backends, chosen by DATABASE_URL:
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 import psycopg
@@ -39,6 +39,7 @@ class DocumentRecord:
     document_id: str
     filename: str
     metadata: dict
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -96,6 +97,18 @@ class MemoryRepository:
         with self._lock:
             self._conversations.pop(conversation_id, None)
             self._histories.pop(conversation_id, None)
+
+    def documents_older_than(self, cutoff: datetime) -> list[str]:
+        return [d.document_id for d in self._documents.values() if d.created_at < cutoff]
+
+    def delete_document(self, document_id: str) -> None:
+        """Removes the document record and every conversation about it."""
+        with self._lock:
+            for cid in [c.id for c in self._conversations.values()
+                        if c.document_id == document_id]:
+                self._conversations.pop(cid, None)
+                self._histories.pop(cid, None)
+            self._documents.pop(document_id, None)
 
 
 # --- PostgreSQL ----------------------------------------------------------------------
@@ -182,6 +195,20 @@ class PostgresRepository:
         self.history(conversation_id).clear()
         with self._engine.begin() as db:
             db.execute(delete(conversations).where(conversations.c.id == conversation_id))
+
+    def documents_older_than(self, cutoff: datetime) -> list[str]:
+        with self._engine.connect() as db:
+            return list(db.scalars(select(documents.c.id).where(documents.c.created_at < cutoff)))
+
+    def delete_document(self, document_id: str) -> None:
+        """Removes the document record and every conversation about it."""
+        with self._engine.begin() as db:
+            ids = list(db.scalars(select(conversations.c.id)
+                                  .where(conversations.c.document_id == document_id)))
+            for cid in ids:
+                self.history(cid).clear()
+            db.execute(delete(conversations).where(conversations.c.document_id == document_id))
+            db.execute(delete(documents).where(documents.c.id == document_id))
 
     @staticmethod
     def _conversation_query():

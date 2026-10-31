@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from app.config import settings
-from app.dependencies import get_document_store
+from app.dependencies import enforce_upload_limit, get_document_store
 from app.schemas import DocumentInfo
 from app.services.document_store import DocumentStore, StoredDocument
 from app.services.pdf_processing import PdfProcessingError
@@ -15,7 +15,7 @@ from app.services.pdf_processing import PdfProcessingError
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
-@router.post("", response_model=DocumentInfo)
+@router.post("", response_model=DocumentInfo, dependencies=[Depends(enforce_upload_limit)])
 def upload_document(
     file: UploadFile,
     store: Annotated[DocumentStore, Depends(get_document_store)],

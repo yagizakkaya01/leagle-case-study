@@ -1,6 +1,7 @@
 """Repository behaviour; the PostgreSQL variant runs only when TEST_DATABASE_URL is set
 (e.g. postgresql://leagle:leagle@127.0.0.1:5432/leagle with `docker compose up -d db`)."""
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -79,3 +80,18 @@ def test_reupload_after_restart_reuses_saved_metadata(repo, tmp_path):
     again = store_with(RunnableLambda(llm)).add(pdf, "agreement.pdf")
     assert len(calls) == 1
     assert again.metadata.title == "Service Agreement" and again.metadata.llm_enriched
+
+
+def test_delete_document_removes_its_conversations(repo, tmp_path):
+    store = make_store(tmp_path, repo)
+    doc = store.add(make_pdf([*PAGES, f"Annex {uuid4()} with enough words to be a chunk."]),
+                    "agreement.pdf")
+    conv, client = str(uuid4()), f"client-{uuid4()}"
+    repo.touch_conversation(conv, client, doc.document_id, title="q")
+    repo.history(conv).add_messages([HumanMessage("Q")])
+
+    assert doc.document_id in repo.documents_older_than(datetime.now(UTC) + timedelta(minutes=1))
+    repo.delete_document(doc.document_id)
+    assert repo.get_document(doc.document_id) is None
+    assert repo.list_conversations(client) == []
+    assert repo.history(conv).messages == []

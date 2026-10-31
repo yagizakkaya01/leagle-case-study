@@ -6,6 +6,11 @@ Upload a PDF, ask questions about it in a conversation, and get answers with the
 FastAPI + LangChain backend, React frontend, PostgreSQL chat history and Azure Blob
 document storage (Azurite locally).
 
+**Live demo: <https://leagle.yagizakkaya.com.tr>** — public, so please do not upload
+confidential documents. Uploads and chats are deleted after 24 hours, and questions are
+rate-limited per visitor. The demo runs the same Docker setup as below (PDFs are stored
+in the Azurite emulator on the server).
+
 | Case requirement | Status |
 |---|---|
 | Upload a single PDF, extract its text | ✅ page-aware extraction with `pdfplumber` |

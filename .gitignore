@@ -1,0 +1,35 @@
+# --- Local-only material (never part of the submission) ---
+/YA-cilekAI/
+/kervansaray/
+/LeagleFSCaseStudy-2.pdf
+/REUSE_NOTES.md
+/.claude/
+/deploy.local/
+docker-compose.override.yml
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- Node ---
+node_modules/
+dist/
+
+# --- Runtime data ---
+storage/
+*.log
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

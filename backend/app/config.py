@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 200
     CHUNK_OVERLAP: int = 40
 
-    # --- LLM (Google Gemini via LangChain) ---
-    GOOGLE_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.8-flash"
+    # --- LLM (NVIDIA NIM via LangChain, see docs/MODEL_SELECTION.md) ---
+    NVIDIA_API_KEY: str = ""
+    NVIDIA_MODEL: str = "google/gemma-4-31b-it"
     LLM_TEMPERATURE: float = 0.0
     LLM_TIMEOUT_SECONDS: float = 60.0
 

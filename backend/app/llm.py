@@ -1,4 +1,4 @@
-"""Chat model factory.
+"""Chat model factory (NVIDIA NIM, see docs/MODEL_SELECTION.md).
 
 Returns None when no API key is configured, so the app still runs (rule-based
 metadata only) and tests never hit the network.
@@ -6,18 +6,18 @@ metadata only) and tests never hit the network.
 from __future__ import annotations
 
 from langchain_core.language_models import BaseChatModel
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
 from app.config import settings
 
 
 def get_chat_model() -> BaseChatModel | None:
-    if not settings.GOOGLE_API_KEY:
+    if not settings.NVIDIA_API_KEY:
         return None
-    return ChatGoogleGenerativeAI(
-        model=settings.GEMINI_MODEL,
-        google_api_key=settings.GOOGLE_API_KEY,
+    return ChatNVIDIA(
+        model=settings.NVIDIA_MODEL,
+        api_key=settings.NVIDIA_API_KEY,
         temperature=settings.LLM_TEMPERATURE,
         timeout=settings.LLM_TIMEOUT_SECONDS,
-        max_retries=2,  # retries 429/5xx; a bad request fails fast
+        usage_telemetry_enabled=False,
     )

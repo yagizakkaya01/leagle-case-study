@@ -12,4 +12,4 @@ pdfplumber~=0.11.10
 
 # --- LangChain ---
 langchain-core~=1.7
-langchain-google-genai~=4.4
+langchain-nvidia-ai-endpoints~=1.5

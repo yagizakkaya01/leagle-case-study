@@ -34,16 +34,10 @@ _PROMPT = ChatPromptTemplate.from_messages([
 ])
 
 
-def build_extractor(
-    llm: BaseChatModel | None, fallback: BaseChatModel | None = None
-) -> Runnable | None:
-    """prompt | llm.with_structured_output(...), optionally with a fallback model."""
+def build_extractor(llm: BaseChatModel | None) -> Runnable | None:
     if llm is None:
         return None
-    structured = llm.with_structured_output(LlmDocumentFields)
-    if fallback is not None:
-        structured = structured.with_fallbacks([fallback.with_structured_output(LlmDocumentFields)])
-    return _PROMPT | structured
+    return _PROMPT | llm.with_structured_output(LlmDocumentFields)
 
 
 def _prompt_text(pages: list[str]) -> str:

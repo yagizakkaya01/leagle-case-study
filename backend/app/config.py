@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     # --- LLM (Google Gemini via LangChain) ---
     GOOGLE_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
-    GEMINI_FALLBACK_MODEL: str = ""  # optional second model tried when the first fails
     LLM_TEMPERATURE: float = 0.0
     LLM_TIMEOUT_SECONDS: float = 60.0
 

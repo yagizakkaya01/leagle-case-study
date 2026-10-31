@@ -11,23 +11,13 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from app.config import settings
 
 
-def _gemini(model: str) -> ChatGoogleGenerativeAI:
+def get_chat_model() -> BaseChatModel | None:
+    if not settings.GOOGLE_API_KEY:
+        return None
     return ChatGoogleGenerativeAI(
-        model=model,
+        model=settings.GEMINI_MODEL,
         google_api_key=settings.GOOGLE_API_KEY,
         temperature=settings.LLM_TEMPERATURE,
         timeout=settings.LLM_TIMEOUT_SECONDS,
         max_retries=2,  # retries 429/5xx; a bad request fails fast
     )
-
-
-def get_chat_model() -> BaseChatModel | None:
-    if not settings.GOOGLE_API_KEY:
-        return None
-    return _gemini(settings.GEMINI_MODEL)
-
-
-def get_fallback_chat_model() -> BaseChatModel | None:
-    if not settings.GOOGLE_API_KEY or not settings.GEMINI_FALLBACK_MODEL:
-        return None
-    return _gemini(settings.GEMINI_FALLBACK_MODEL)

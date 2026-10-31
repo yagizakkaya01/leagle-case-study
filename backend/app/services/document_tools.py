@@ -18,6 +18,7 @@ from app.services.document_store import StoredDocument
 
 ClauseCategory = Literal[tuple(CLAUSE_KEYWORDS)]  # type: ignore[valid-type]
 MAX_RESULTS = 5
+MAX_LINKED = 4
 
 
 @dataclass
@@ -26,10 +27,12 @@ class Evidence:
 
     chunks: dict[str, Document] = field(default_factory=dict)
 
-    def add(self, docs: list[Document]) -> str:
-        for d in docs:
+    def add(self, docs: list[Document], linked: list[Document] = ()) -> str:
+        for d in [*docs, *linked]:
             self.chunks[d.metadata["chunk_id"]] = d
-        return json.dumps([_chunk_view(d) for d in docs], ensure_ascii=False)
+        views = [_chunk_view(d) for d in docs]
+        views += [{**_chunk_view(d), "linked": True} for d in linked]
+        return json.dumps(views, ensure_ascii=False)
 
 
 def _chunk_view(doc: Document) -> dict:
@@ -41,6 +44,26 @@ def _chunk_view(doc: Document) -> dict:
         "clause_category": m["clause_category"],
         "text": doc.page_content,
     }
+
+
+def linked_chunks(all_chunks: list[Document], hits: list[Document]) -> list[Document]:
+    """Chunks connected to the hits by a clause cross-reference, in either direction.
+
+    A provision's meaning often depends on text elsewhere that points at it
+    (amendments, side letters, "notwithstanding clause 6") or that it points to
+    ("subject to clause 9"). Search alone may return only one side.
+    """
+    seen = {h.metadata["chunk_id"] for h in hits}
+    clauses = {h.metadata["clause_number"] for h in hits} - {None}
+    cited = {ref for h in hits for ref in h.metadata.get("references", [])}
+    out = []
+    for c in all_chunks:
+        m = c.metadata
+        if m["chunk_id"] in seen:
+            continue
+        if clauses.intersection(m.get("references", [])) or m["clause_number"] in cited:
+            out.append(c)
+    return out[:MAX_LINKED]
 
 
 def make_tools(doc: StoredDocument, evidence: Evidence) -> list[BaseTool]:
@@ -63,7 +86,8 @@ def make_tools(doc: StoredDocument, evidence: Evidence) -> list[BaseTool]:
                     and (page_from is None or m["page"] >= page_from)
                     and (page_to is None or m["page"] <= page_to))
 
-        return evidence.add(doc.index.search(query, k=MAX_RESULTS, where=where))
+        hits = doc.index.search(query, k=MAX_RESULTS, where=where)
+        return evidence.add(hits, linked_chunks(doc.chunks, hits))
 
     @tool
     def find_clauses(category: ClauseCategory) -> str:
@@ -71,7 +95,8 @@ def make_tools(doc: StoredDocument, evidence: Evidence) -> list[BaseTool]:
         hits = [c for c in doc.chunks if c.metadata["clause_category"] == category]
         if not hits:
             return f"No chunks are tagged '{category}'. Try search_document instead."
-        return evidence.add(hits[:MAX_RESULTS * 2])
+        hits = hits[:MAX_RESULTS * 2]
+        return evidence.add(hits, linked_chunks(doc.chunks, hits))
 
     @tool
     def get_page(page_number: int) -> str:

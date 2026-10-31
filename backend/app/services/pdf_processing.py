@@ -19,6 +19,7 @@ from app.services.chunk_metadata import (
     has_amount,
     has_date,
     parse_heading,
+    referenced_clauses,
 )
 
 _MIN_REAL_WORDS = 8
@@ -131,6 +132,7 @@ def _chunk_document(
             "has_amount": has_amount(text),
             "has_date": has_date(text),
             "defined_terms": defined_terms(text),
+            "references": referenced_clauses(text, section.clause_number),
         },
     )
 

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage
@@ -183,3 +185,18 @@ def test_stream_raises_when_the_model_fails(doc):
     llm = ScriptedChatModel(replies=[], seen=[], tool_choices=[])
     with pytest.raises(IndexError):
         list(ChatService(llm, MemoryRepository().history).ask_stream(doc, "s1", "q"))
+
+
+def test_streamed_turn_sends_its_tool_calls_back_to_the_provider(doc):
+    """Regression: ChatNVIDIA only forwards additional_kwargs["tool_calls"]; a streamed
+    turn without it produced a tool result with no matching call (HTTP 400)."""
+    from langchain_nvidia_ai_endpoints._utils import convert_message_to_dict
+
+    from app.services.chat import _stream_reply
+
+    llm = ScriptedChatModel(replies=[tool_call("search_document", {"query": "aylık ücret"})],
+                            seen=[], tool_choices=[])
+    turn = _stream_reply(llm, [HumanMessage("Aylık ücret ne kadar?")], emit=lambda _: None)
+    sent = convert_message_to_dict(turn)
+    assert sent["tool_calls"][0]["function"]["name"] == "search_document"
+    assert json.loads(sent["tool_calls"][0]["function"]["arguments"]) == {"query": "aylık ücret"}

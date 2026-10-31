@@ -77,3 +77,19 @@ def test_large_font_line_is_a_heading_even_without_numbers():
     assert parse_heading("Payment Terms", large_font=True) == ("Payment Terms", None)
     long_line = "This is a long sentence in a big font that goes well past the heading limit"
     assert parse_heading(long_line, large_font=True) is None
+
+
+def test_referenced_clauses_in_english_and_turkish():
+    from app.services.chunk_metadata import referenced_clauses
+    assert referenced_clauses("In clause 2 ... In clause 7, the amount") == ["2", "7"]
+    assert referenced_clauses("Subject to clause 9, the Distributor", own="6") == ["9"]
+    assert referenced_clauses("see clauses 2 and 7, Section 4.1, 3. maddesi ve Madde 5") == [
+        "2", "3", "4.1", "5", "7"]
+    assert referenced_clauses("This clause applies", own="3") == []
+
+
+def test_capitalised_lead_in_is_a_heading():
+    assert parse_heading("AMENDMENT No. 1 (signed 1 July 2024)") == (
+        "AMENDMENT No. 1 (signed 1 July 2024)", None)
+    assert parse_heading("SIDE LETTER dated 20 January 2025")
+    assert parse_heading("LCIA Rules apply to the arbitration") is None

@@ -41,7 +41,14 @@ def parse_heading(line: str, *, large_font: bool = False) -> tuple[str, str | No
     letters = [c for c in line if c.isalpha()]
     if large_font or (len(letters) >= 4 and all(c.isupper() for c in letters)):
         return line, None
+    # "AMENDMENT No. 1 (signed ...)", "SIDE LETTER dated ...": a capitalised lead-in.
+    if _CAPS_LEAD.match(line):
+        return line, None
     return None
+
+
+# Two or more all-caps words, or one of six letters or more, at the start of a line.
+_CAPS_LEAD = re.compile(r"^(?:[A-ZÇĞİÖŞÜ]{2,}\s+[A-ZÇĞİÖŞÜ]{2,}|[A-ZÇĞİÖŞÜ]{6,})\b")
 
 
 # --- Clause categories ----------------------------------------------------------
@@ -116,6 +123,24 @@ def has_date(text: str) -> bool:
 
 def defined_terms(text: str) -> list[str]:
     return sorted({m.strip() for m in _DEFINED_TERM.findall(text)})
+
+
+# --- Cross-references -----------------------------------------------------------------
+# "clause 3", "clauses 2 and 7", "Section 4.1", "Article 5", "Madde 3", "3. maddesi".
+_NUM = r"\d+(?:\.\d+)*"
+_REF_AFTER = re.compile(
+    rf"\b(?:clauses?|sections?|articles?|paragraphs?|madde\w*)\s+"
+    rf"({_NUM}(?:\s*(?:,|and|or|ve|veya|-|to)\s*{_NUM})*)"
+)
+_REF_BEFORE = re.compile(rf"\b({_NUM})\.?\s*madde")
+
+
+def referenced_clauses(text: str, own: str | None = None) -> list[str]:
+    """Clause numbers this text refers to, excluding its own clause."""
+    folded = to_ascii(text)
+    found = [n for m in _REF_AFTER.finditer(folded) for n in re.findall(_NUM, m.group(1))]
+    found += _REF_BEFORE.findall(folded)
+    return sorted({n for n in found if n != own}, key=lambda n: [int(x) for x in n.split(".")])
 
 
 # --- Turkish court case numbers ---------------------------------------------------

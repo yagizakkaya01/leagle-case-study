@@ -4,11 +4,14 @@ Fields
 - doc:          key in documents.DOCUMENTS
 - question:     what the user asks (`history` = earlier questions in the same chat)
 - found:        whether the document contains the answer
-- page:         1-based page that holds the answer (None when found is False)
-- evidence:     text that must appear on `page` (checked by tests/test_eval_gold.py)
+- page:         1-based page that holds the answer (None when found is False); an int,
+                or a tuple of pages when the answer may be cited from any of them
+- evidence:     text that must appear on (one of) `page` (checked by tests/test_eval_gold.py)
 - must_contain: groups of alternatives; the answer must contain one item of every group
                 (compared case- and accent-insensitively)
 - must_not:     strings that must NOT appear in the answer (used for injection/hallucination)
+- tool:         a tool the model is expected to call (tool-use accuracy), optional
+- failure_mode: which known weakness the question probes (hard set)
 """
 from __future__ import annotations
 
@@ -16,12 +19,14 @@ SA, CD = "service_agreement", "court_decision"
 
 
 def q(id, doc, category, question, *, page=None, evidence=None, must_contain=(),
-      must_not=(), found=True, history=(), tags=()):
+      must_not=(), found=True, history=(), tags=(), tool=None, failure_mode=None):
+    pages = [page] if isinstance(page, int) else list(page or [])
     return {
         "id": id, "doc": doc, "category": category, "question": question,
-        "found": found, "page": page, "evidence": evidence,
-        "must_contain": [list(g) for g in must_contain], "must_not": list(must_not),
-        "history": list(history), "tags": list(tags),
+        "found": found, "pages": pages, "page": pages[0] if pages else None,
+        "evidence": evidence, "must_contain": [list(g) for g in must_contain],
+        "must_not": list(must_not), "history": list(history), "tags": list(tags),
+        "tool": tool, "failure_mode": failure_mode,
     }
 
 

@@ -1,15 +1,15 @@
 """Keeps uploaded PDFs, their processed chunks and metadata.
 
-Files go to a local folder; processed documents are cached in memory. After a
-restart a document is rebuilt from its stored file and saved metadata, so old
-conversations can be reopened without calling the LLM again.
+PDF files go to a FileStorage (local folder or Azure Blob); processed documents
+are cached in memory. After a restart a document is rebuilt from its stored file
+and saved metadata, so old conversations can be reopened without calling the
+LLM again.
 """
 from __future__ import annotations
 
 import hashlib
 import threading
 from dataclasses import dataclass
-from pathlib import Path
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
@@ -17,6 +17,7 @@ from langchain_core.runnables import Runnable
 
 from app.schemas import DocumentMetadata
 from app.services.document_metadata import extract_metadata
+from app.services.file_storage import FileStorage
 from app.services.pdf_processing import process_pdf
 from app.services.persistence import DocumentRecord, Repository
 from app.services.search_index import SearchIndex
@@ -40,7 +41,7 @@ class StoredDocument:
 class DocumentStore:
     def __init__(
         self,
-        storage_dir: Path,
+        files: FileStorage,
         *,
         chunk_size: int,
         overlap: int,
@@ -49,7 +50,7 @@ class DocumentStore:
         embeddings: Embeddings | None = None,
         repository: Repository | None = None,
     ):
-        self._dir = storage_dir
+        self._files = files
         self._chunk_size = chunk_size
         self._overlap = overlap
         self._max_pages = max_pages
@@ -68,8 +69,7 @@ class DocumentStore:
             return existing
 
         doc = self._build(data, document_id, filename)
-        self._dir.mkdir(parents=True, exist_ok=True)
-        self._path(document_id).write_bytes(data)
+        self._files.save(document_id, data)
         if self._repository is not None and doc.chunks:
             self._repository.save_document(DocumentRecord(
                 document_id, filename,
@@ -85,17 +85,14 @@ class DocumentStore:
         if cached or self._repository is None:
             return cached
         record = self._repository.get_document(document_id)
-        if record is None or not self._path(document_id).exists():
+        data = self._files.load(document_id) if record else None
+        if record is None or data is None:
             return None
         meta = DocumentMetadata.model_validate(record.metadata)
-        doc = self._build(self._path(document_id).read_bytes(), document_id, record.filename,
-                          meta)
+        doc = self._build(data, document_id, record.filename, meta)
         with self._lock:
             self._documents[document_id] = doc
         return doc
-
-    def _path(self, document_id: str) -> Path:
-        return self._dir / f"{document_id}.pdf"
 
     def _build(self, data: bytes, document_id: str, filename: str,
                metadata: DocumentMetadata | None = None) -> StoredDocument:

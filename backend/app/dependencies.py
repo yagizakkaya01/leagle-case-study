@@ -8,6 +8,7 @@ from app.llm import get_chat_model, get_embeddings
 from app.services.chat import ChatService
 from app.services.document_metadata import build_extractor
 from app.services.document_store import DocumentStore
+from app.services.file_storage import build_file_storage
 from app.services.persistence import Repository, build_repository
 
 
@@ -19,7 +20,8 @@ def get_repository() -> Repository:
 @lru_cache
 def get_document_store() -> DocumentStore:
     return DocumentStore(
-        settings.STORAGE_DIR,
+        build_file_storage(settings.AZURE_STORAGE_CONNECTION_STRING,
+                           settings.AZURE_STORAGE_CONTAINER, settings.STORAGE_DIR),
         chunk_size=settings.CHUNK_SIZE,
         overlap=settings.CHUNK_OVERLAP,
         max_pages=settings.MAX_PAGES,

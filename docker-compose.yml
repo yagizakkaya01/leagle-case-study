@@ -17,5 +17,17 @@ services:
       timeout: 5s
       retries: 10
 
+  # Local Azure Blob Storage emulator; set AZURE_STORAGE_CONNECTION_STRING to use it
+  # (or point the same variable at a real storage account).
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    restart: unless-stopped
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --skipApiVersionCheck --loose
+    ports:
+      - "127.0.0.1:10000:10000"
+    volumes:
+      - blob_data:/data
+
 volumes:
   db_data:
+  blob_data:

@@ -4,13 +4,14 @@ from fastapi.testclient import TestClient
 from app.dependencies import get_document_store
 from app.main import app
 from app.services.document_store import DocumentStore
+from app.services.file_storage import LocalFileStorage
 from tests.pdf_factory import make_pdf
 from tests.test_pdf_processing import CLAUSE
 
 
 @pytest.fixture
 def client(tmp_path):
-    store = DocumentStore(tmp_path, chunk_size=200, overlap=40, max_pages=50)
+    store = DocumentStore(LocalFileStorage(tmp_path), chunk_size=200, overlap=40, max_pages=50)
     app.dependency_overrides[get_document_store] = lambda: store
     yield TestClient(app)
     app.dependency_overrides.clear()

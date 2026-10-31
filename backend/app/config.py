@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173"
 
     # --- Uploads ---
-    STORAGE_DIR: Path = BACKEND_DIR / "storage"
+    STORAGE_DIR: Path = BACKEND_DIR / "storage"  # used when Azure is not configured
+    AZURE_STORAGE_CONNECTION_STRING: str = ""
+    AZURE_STORAGE_CONTAINER: str = "documents"
     MAX_UPLOAD_MB: int = 10
     MAX_PAGES: int = 50
 

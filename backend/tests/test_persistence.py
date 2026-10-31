@@ -6,9 +6,8 @@ from uuid import uuid4
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
-from app.services.document_store import DocumentStore
 from app.services.persistence import MemoryRepository, PostgresRepository
-from tests.pdf_factory import make_pdf
+from tests.pdf_factory import make_pdf, make_store
 from tests.test_chat import PAGES
 
 PG_URL = os.environ.get("TEST_DATABASE_URL", "")
@@ -24,11 +23,11 @@ def repo(request):
 
 
 def test_document_is_rebuilt_after_restart_without_llm(repo, tmp_path):
-    first = DocumentStore(tmp_path, chunk_size=200, overlap=40, max_pages=10, repository=repo)
+    first = make_store(tmp_path, repo)
     doc = first.add(make_pdf(PAGES), "agreement.pdf")
 
     # A fresh store (new process) with the same files and database.
-    second = DocumentStore(tmp_path, chunk_size=200, overlap=40, max_pages=10, repository=repo)
+    second = make_store(tmp_path, repo)
     reloaded = second.get(doc.document_id)
     assert reloaded is not None
     assert reloaded.filename == "agreement.pdf"
@@ -39,7 +38,7 @@ def test_document_is_rebuilt_after_restart_without_llm(repo, tmp_path):
 
 
 def test_conversation_and_history_round_trip(repo, tmp_path):
-    store = DocumentStore(tmp_path, chunk_size=200, overlap=40, max_pages=10, repository=repo)
+    store = make_store(tmp_path, repo)
     doc = store.add(make_pdf(PAGES), "agreement.pdf")
     conv, client = str(uuid4()), f"client-{uuid4()}"
 

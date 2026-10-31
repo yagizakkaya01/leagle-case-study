@@ -5,7 +5,7 @@ import logging
 
 from app.config import settings
 
-_NOISY = ("httpx", "httpx2", "httpcore", "pdfminer", "urllib3")
+_NOISY = ("httpx", "httpx2", "httpcore", "pdfminer", "urllib3", "azure")
 
 
 def setup_logging() -> None:

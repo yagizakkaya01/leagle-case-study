@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from app.schemas import FinalAnswer
 from app.services.chat import ChatService
 from app.services.document_store import DocumentStore
+from app.services.file_storage import LocalFileStorage
 from app.services.grounding import UNVERIFIED_ANSWER, verify
 from app.services.persistence import MemoryRepository
 from app.services.search_index import SearchIndex, rrf_merge
@@ -21,7 +22,7 @@ PAGES = [
 
 @pytest.fixture
 def doc(tmp_path):
-    store = DocumentStore(tmp_path, chunk_size=200, overlap=40, max_pages=10)
+    store = DocumentStore(LocalFileStorage(tmp_path), chunk_size=200, overlap=40, max_pages=10)
     return store.add(make_pdf(PAGES), "agreement.pdf")
 
 

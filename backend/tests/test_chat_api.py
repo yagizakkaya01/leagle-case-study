@@ -6,17 +6,16 @@ from fastapi.testclient import TestClient
 from app.dependencies import get_chat_service, get_document_store, get_repository
 from app.main import app
 from app.services.chat import ChatService
-from app.services.document_store import DocumentStore
 from app.services.persistence import MemoryRepository
 from tests.fakes import ScriptedChatModel, tool_call
-from tests.pdf_factory import make_pdf
+from tests.pdf_factory import make_pdf, make_store
 from tests.test_chat import PAGES
 
 
 @pytest.fixture
 def setup(tmp_path):
     repo = MemoryRepository()
-    store = DocumentStore(tmp_path, chunk_size=200, overlap=40, max_pages=10, repository=repo)
+    store = make_store(tmp_path, repo)
     doc = store.add(make_pdf(PAGES), "agreement.pdf")
     llm = ScriptedChatModel(replies=[], seen=[], tool_choices=[])
     app.dependency_overrides[get_document_store] = lambda: store

@@ -1,6 +1,18 @@
 """Builds tiny text PDFs in memory so tests need no binary fixtures."""
 from __future__ import annotations
 
+from pathlib import Path
+
+from app.services.document_store import DocumentStore
+from app.services.file_storage import FileStorage, LocalFileStorage
+from app.services.persistence import Repository
+
+
+def make_store(where: Path | FileStorage, repository: Repository | None = None) -> DocumentStore:
+    """DocumentStore with test-sized chunking and no LLM or embeddings."""
+    files = LocalFileStorage(where) if isinstance(where, Path) else where
+    return DocumentStore(files, chunk_size=200, overlap=40, max_pages=10, repository=repository)
+
 
 def make_pdf(pages: list[str]) -> bytes:
     """One page per string; an empty string produces a page with no text."""

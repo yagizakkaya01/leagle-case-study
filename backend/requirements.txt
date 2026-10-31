@@ -18,6 +18,9 @@ rapidfuzz~=3.14
 langchain-core~=1.7
 langchain-nvidia-ai-endpoints~=1.5
 
+# --- Cloud file storage (optional, used when AZURE_STORAGE_CONNECTION_STRING is set) ---
+azure-storage-blob~=12.31
+
 # --- Persistence (optional, used when DATABASE_URL is set) ---
 langchain-postgres~=0.0.19
 psycopg[binary]~=3.3

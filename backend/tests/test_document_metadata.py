@@ -62,3 +62,8 @@ def test_llm_failure_falls_back_to_rule_metadata():
     meta = extract_metadata(_processed(), extractor=RunnableLambda(broken))
     assert meta.llm_enriched is False
     assert meta.outline
+
+
+def test_missing_tool_call_falls_back_to_rule_metadata():
+    meta = extract_metadata(_processed(), extractor=RunnableLambda(lambda _: None))
+    assert meta.llm_enriched is False

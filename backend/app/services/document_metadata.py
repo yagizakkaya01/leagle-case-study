@@ -13,6 +13,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
+from app.llm import structured_output
 from app.schemas import DocumentMetadata, LlmDocumentFields, OutlineItem
 from app.services.chunk_metadata import OTHER, case_numbers
 from app.services.pdf_processing import ProcessedPdf
@@ -37,7 +38,7 @@ _PROMPT = ChatPromptTemplate.from_messages([
 def build_extractor(llm: BaseChatModel | None) -> Runnable | None:
     if llm is None:
         return None
-    return _PROMPT | llm.with_structured_output(LlmDocumentFields)
+    return _PROMPT | structured_output(llm, LlmDocumentFields)
 
 
 def _prompt_text(pages: list[str]) -> str:
@@ -67,12 +68,15 @@ def extract_metadata(processed: ProcessedPdf, extractor: Runnable | None) -> Doc
         return metadata
 
     try:
-        fields: LlmDocumentFields = extractor.invoke({
+        fields: LlmDocumentFields | None = extractor.invoke({
             "outline": "\n".join(f"- {o.heading} (p. {o.page})" for o in outline) or "(none)",
             "text": _prompt_text(processed.pages),
         })
     except Exception:  # metadata is a nice-to-have; never fail the upload over it
         log.warning("LLM metadata extraction failed", exc_info=True)
+        return metadata
+    if fields is None:  # the model answered without calling the schema tool
+        log.warning("LLM returned no metadata tool call")
         return metadata
 
     return DocumentMetadata(**{**metadata.model_dump(), **fields.model_dump(),

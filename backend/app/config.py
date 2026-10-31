@@ -23,8 +23,10 @@ class Settings(BaseSettings):
 
     # --- LLM (NVIDIA NIM via LangChain, see docs/MODEL_SELECTION.md) ---
     NVIDIA_API_KEY: str = ""
-    NVIDIA_MODEL: str = "google/gemma-4-31b-it"
+    NVIDIA_MODEL: str = "mistralai/mistral-large-4-1t-a52b"
     LLM_TEMPERATURE: float = 0.0
+    LLM_MAX_TOKENS: int = 4096
+    LLM_REASONING_EFFORT: str = "low"  # "low" | "medium" | "high"; empty = model default
     LLM_TIMEOUT_SECONDS: float = 60.0
 
     # --- Logging ---

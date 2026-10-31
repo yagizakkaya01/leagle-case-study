@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import chat, documents
+from app.api import chat, conversations, documents
 from app.config import settings
 from app.logging_config import setup_logging
 
@@ -19,6 +19,7 @@ app.add_middleware(
 )
 app.include_router(documents.router)
 app.include_router(chat.router)
+app.include_router(conversations.router)
 
 
 @app.get("/healthz", tags=["health"])

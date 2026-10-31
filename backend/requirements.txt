@@ -17,3 +17,8 @@ rapidfuzz~=3.14
 # --- LangChain ---
 langchain-core~=1.7
 langchain-nvidia-ai-endpoints~=1.5
+
+# --- Persistence (optional, used when DATABASE_URL is set) ---
+langchain-postgres~=0.0.19
+psycopg[binary]~=3.3
+SQLAlchemy~=2.1

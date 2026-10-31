@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { askQuestion } from "../api/client";
+import type { StoredMessage } from "../types";
 import ChatMessage, { TypingIndicator, type ChatEntry } from "./ChatMessage";
 
 const MAX_QUESTION_LENGTH = 1000;
@@ -16,14 +17,39 @@ type NewEntry = ChatEntry extends infer E ? (E extends ChatEntry ? Omit<E, "id">
 interface ChatPanelProps {
   documentId: string;
   sessionId: string;
+  initialMessages?: StoredMessage[]; // restored from a saved conversation
+  onAnswered?: () => void;
 }
 
-export default function ChatPanel({ documentId, sessionId }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatEntry[]>([]);
+// Saved messages -> the same entries live answers produce (no tool calls / timing)
+function toEntries(stored: StoredMessage[]): ChatEntry[] {
+  return stored.map((msg, id) =>
+    msg.role === "user"
+      ? { id, role: "user", text: msg.content }
+      : {
+          id,
+          role: "assistant",
+          answer: {
+            answer: msg.content,
+            found: msg.found,
+            page_number: msg.page_number,
+            reference_text: msg.reference_text,
+          },
+        },
+  );
+}
+
+export default function ChatPanel({
+  documentId,
+  sessionId,
+  initialMessages = [],
+  onAnswered,
+}: ChatPanelProps) {
+  const [messages, setMessages] = useState<ChatEntry[]>(() => toEntries(initialMessages));
   const [input, setInput] = useState("");
   const [isWaiting, setIsWaiting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const nextId = useRef(0);
+  const nextId = useRef(initialMessages.length);
 
   // Keep the newest message in view
   useEffect(() => {
@@ -46,6 +72,7 @@ export default function ChatPanel({ documentId, sessionId }: ChatPanelProps) {
     try {
       const answer = await askQuestion(documentId, sessionId, question);
       append({ role: "assistant", answer });
+      onAnswered?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       append({ role: "error", text: `Error: ${message}` });

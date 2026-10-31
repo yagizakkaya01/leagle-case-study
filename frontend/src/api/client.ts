@@ -1,4 +1,10 @@
-import type { ChatAnswer, DocumentInfo } from "../types";
+import type {
+  ChatAnswer,
+  ConversationDetail,
+  ConversationSummary,
+  DocumentInfo,
+} from "../types";
+import { getClientId } from "./clientId";
 
 const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
@@ -15,20 +21,28 @@ async function toError(response: Response): Promise<Error> {
   return new Error(`Request failed with status ${response.status}`);
 }
 
-export async function uploadDocument(file: File): Promise<DocumentInfo> {
-  const form = new FormData();
-  form.append("file", file);
-
+// fetch with a friendly network error and `detail`-aware HTTP errors
+async function request(path: string, init?: RequestInit): Promise<Response> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/api/documents`, { method: "POST", body: form });
+    response = await fetch(`${API_URL}${path}`, init);
   } catch {
     throw new Error("Could not reach the server. Is the backend running?");
   }
-
   if (!response.ok) {
     throw await toError(response);
   }
+  return response;
+}
+
+function clientQuery(): string {
+  return `client_id=${encodeURIComponent(getClientId())}`;
+}
+
+export async function uploadDocument(file: File): Promise<DocumentInfo> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await request("/api/documents", { method: "POST", body: form });
   return (await response.json()) as DocumentInfo;
 }
 
@@ -37,19 +51,31 @@ export async function askQuestion(
   sessionId: string,
   question: string,
 ): Promise<ChatAnswer> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ document_id: documentId, session_id: sessionId, question }),
-    });
-  } catch {
-    throw new Error("Could not reach the server. Is the backend running?");
-  }
-
-  if (!response.ok) {
-    throw await toError(response);
-  }
+  const response = await request("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      document_id: documentId,
+      session_id: sessionId,
+      client_id: getClientId(),
+      question,
+    }),
+  });
   return (await response.json()) as ChatAnswer;
+}
+
+export async function listConversations(): Promise<ConversationSummary[]> {
+  const response = await request(`/api/conversations?${clientQuery()}`);
+  return (await response.json()) as ConversationSummary[];
+}
+
+export async function getConversation(sessionId: string): Promise<ConversationDetail> {
+  const id = encodeURIComponent(sessionId);
+  const response = await request(`/api/conversations/${id}?${clientQuery()}`);
+  return (await response.json()) as ConversationDetail;
+}
+
+export async function deleteConversation(sessionId: string): Promise<void> {
+  const id = encodeURIComponent(sessionId);
+  await request(`/api/conversations/${id}?${clientQuery()}`, { method: "DELETE" });
 }

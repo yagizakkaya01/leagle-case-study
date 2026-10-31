@@ -61,3 +61,26 @@ export interface ChatAnswer {
   tool_calls: ToolCallInfo[]; // tools the model used, in order
   elapsed_seconds: number;
 }
+
+// Saved conversation as listed in the sidebar (newest first)
+export interface ConversationSummary {
+  session_id: string;
+  document_id: string;
+  filename: string;
+  title: string;
+  updated_at: string; // ISO timestamp
+}
+
+export interface StoredMessage {
+  role: "user" | "assistant";
+  content: string;
+  found: boolean | null;
+  page_number: number | null;
+  reference_text: string | null;
+}
+
+export interface ConversationDetail {
+  session_id: string;
+  document: DocumentInfo;
+  messages: StoredMessage[];
+}

@@ -1,7 +1,9 @@
 """Request / response models shared by the API."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -76,7 +78,8 @@ class FinalAnswer(BaseModel):
 
 class ChatRequest(BaseModel):
     document_id: str
-    session_id: str = Field(min_length=1, max_length=100)
+    session_id: UUID  # conversation id, created by the browser
+    client_id: str = Field(min_length=1, max_length=100)  # anonymous browser id
     question: str = Field(min_length=1, max_length=1000)
 
 
@@ -92,3 +95,27 @@ class ChatAnswer(BaseModel):
     found: bool
     tool_calls: list[ToolCallInfo] = Field(default_factory=list)
     elapsed_seconds: float = 0.0
+
+
+# --- Conversations ---------------------------------------------------------------
+
+class ConversationSummary(BaseModel):
+    session_id: str
+    document_id: str
+    filename: str
+    title: str
+    updated_at: datetime
+
+
+class StoredMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    found: bool | None = None
+    page_number: int | None = None
+    reference_text: str | None = None
+
+
+class ConversationDetail(BaseModel):
+    session_id: str
+    document: DocumentInfo
+    messages: list[StoredMessage]

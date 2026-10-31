@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 200
     CHUNK_OVERLAP: int = 40
 
+    # --- Persistence: empty = in memory; postgresql://user:pass@host:5432/db = persistent ---
+    DATABASE_URL: str = ""
+
     # --- LLM (NVIDIA NIM via LangChain, see docs/MODEL_SELECTION.md) ---
     NVIDIA_API_KEY: str = ""
     NVIDIA_MODEL: str = "mistralai/mistral-large-4-1t-a52b"

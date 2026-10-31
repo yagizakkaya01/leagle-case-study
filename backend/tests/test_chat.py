@@ -3,9 +3,10 @@ from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.schemas import FinalAnswer
-from app.services.chat import ChatService, InMemoryHistories
+from app.services.chat import ChatService
 from app.services.document_store import DocumentStore
 from app.services.grounding import UNVERIFIED_ANSWER, verify
+from app.services.persistence import MemoryRepository
 from app.services.search_index import SearchIndex, rrf_merge
 from tests.fakes import ScriptedChatModel, tool_call
 from tests.pdf_factory import make_pdf
@@ -90,7 +91,8 @@ def test_chat_runs_tool_then_returns_verified_answer(doc):
                                   "page_number": 1, "reference_text": "ninety days written notice"},
                   call_id="c2"),
     ], seen=[], tool_choices=[])
-    answer = ChatService(llm, InMemoryHistories()).ask(doc, "s1", "How can it be terminated?")
+    chat = ChatService(llm, MemoryRepository().history)
+    answer = chat.ask(doc, "s1", "How can it be terminated?")
 
     assert answer.found is True
     assert answer.page_number == 2  # corrected from the model's 1
@@ -105,7 +107,7 @@ def test_conversation_history_is_kept_per_session(doc):
         tool_call("FinalAnswer", {"answer": "Other session", "found": False}),
     ]
     llm = ScriptedChatModel(replies=replies, seen=[], tool_choices=[])
-    chat = ChatService(llm, InMemoryHistories())
+    chat = ChatService(llm, MemoryRepository().history)
     chat.ask(doc, "s1", "first question")
     chat.ask(doc, "s1", "follow-up")
     chat.ask(doc, "s2", "unrelated")
@@ -125,7 +127,7 @@ def test_last_round_forces_final_answer(doc):
         tool_call("search_document", {"query": "c"}, "c3"),
         tool_call("FinalAnswer", {"answer": "Stopped", "found": False}, "c4"),
     ], seen=[], tool_choices=[])
-    answer = ChatService(llm, InMemoryHistories()).ask(doc, "s1", "q")
+    answer = ChatService(llm, MemoryRepository().history).ask(doc, "s1", "q")
     assert llm.tool_choices[-1] == "FinalAnswer"
     assert answer.answer == "Stopped" and len(answer.tool_calls) == 3
 
@@ -133,12 +135,12 @@ def test_last_round_forces_final_answer(doc):
 def test_plain_text_reply_is_never_marked_as_found(doc):
     llm = ScriptedChatModel(replies=[AIMessage(content="Hello! Ask me about the document.")],
                             seen=[], tool_choices=[])
-    answer = ChatService(llm, InMemoryHistories()).ask(doc, "s1", "hi")
+    answer = ChatService(llm, MemoryRepository().history).ask(doc, "s1", "hi")
     assert answer.found is False and answer.answer.startswith("Hello")
 
 
 def test_malformed_final_answer_drops_citation(doc):
     bad = tool_call("FinalAnswer", {"answer": "x", "page_number": "two"})
     llm = ScriptedChatModel(replies=[bad], seen=[], tool_choices=[])
-    answer = ChatService(llm, InMemoryHistories()).ask(doc, "s1", "q")
+    answer = ChatService(llm, MemoryRepository().history).ask(doc, "s1", "q")
     assert answer.found is False and answer.page_number is None

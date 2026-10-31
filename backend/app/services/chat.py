@@ -4,8 +4,9 @@ Flow per question:
 1. RunnableWithMessageHistory loads the conversation for (document, session).
 2. The model calls document tools until it has evidence, then calls FinalAnswer.
 3. grounding.verify() checks the cited chunk and quote against that evidence.
-4. Only the user question and the final answer text are written to history;
-   tool traffic stays out of memory.
+4. Only the user question and the final answer are written to history (the
+   citation rides along in additional_kwargs for the UI); tool traffic stays
+   out of memory.
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ import logging
 import time
 from collections.abc import Callable
 
-from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
+from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
@@ -57,16 +58,6 @@ RULES
 HistoryFactory = Callable[[str], BaseChatMessageHistory]
 
 
-class InMemoryHistories:
-    """Runtime conversation memory, one LangChain history per session key."""
-
-    def __init__(self) -> None:
-        self._store: dict[str, InMemoryChatMessageHistory] = {}
-
-    def __call__(self, session_key: str) -> BaseChatMessageHistory:
-        return self._store.setdefault(session_key, InMemoryChatMessageHistory())
-
-
 class ChatService:
     def __init__(self, llm: BaseChatModel, histories: HistoryFactory):
         self._llm = llm
@@ -78,11 +69,11 @@ class ChatService:
             output_messages_key="answer",
         )
 
-    def ask(self, doc: StoredDocument, session_id: str, question: str) -> ChatAnswer:
+    def ask(self, doc: StoredDocument, conversation_id: str, question: str) -> ChatAnswer:
         started = time.perf_counter()
         result = self._chain.invoke(
             {"question": question, "doc": doc},
-            config={"configurable": {"session_id": f"{doc.document_id}:{session_id}"}},
+            config={"configurable": {"session_id": conversation_id}},
         )
         answer: ChatAnswer = result["result"]
         answer.elapsed_seconds = round(time.perf_counter() - started, 2)
@@ -99,7 +90,7 @@ class ChatService:
 
         messages: list[BaseMessage] = [
             SystemMessage(self._system_prompt(doc)),
-            *inputs["history"][-MAX_HISTORY_MESSAGES:],
+            *_text_only(inputs["history"][-MAX_HISTORY_MESSAGES:]),
             HumanMessage(inputs["question"]),
         ]
         calls: list[ToolCallInfo] = []
@@ -133,7 +124,8 @@ class ChatService:
             found=checked.found,
             tool_calls=calls,
         )
-        return {"answer": AIMessage(result.answer), "result": result}
+        citation = result.model_dump(include={"found", "page_number", "reference_text"})
+        return {"answer": AIMessage(result.answer, additional_kwargs=citation), "result": result}
 
     @staticmethod
     def _system_prompt(doc: StoredDocument) -> str:
@@ -145,6 +137,12 @@ class ChatService:
             language=meta.language or "unknown",
             categories=", ".join(CLAUSE_KEYWORDS),
         )
+
+
+def _text_only(history: list[BaseMessage]) -> list[BaseMessage]:
+    """History as plain question/answer text; stored citations are for the UI only."""
+    return [HumanMessage(m.content) if m.type == "human" else AIMessage(m.content)
+            for m in history if m.type in ("human", "ai")]
 
 
 def _run_tool(tools: dict, name: str, args: dict) -> str:

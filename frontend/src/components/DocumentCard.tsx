@@ -4,6 +4,7 @@ import type { DocumentInfo } from "../types";
 interface DocumentCardProps {
   doc: DocumentInfo;
   onReset: () => void;
+  onNewChat: () => void;
 }
 
 // "court_decision" -> "Court decision"
@@ -21,7 +22,7 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export default function DocumentCard({ doc, onReset }: DocumentCardProps) {
+export default function DocumentCard({ doc, onReset, onNewChat }: DocumentCardProps) {
   const meta = doc.metadata;
   const clauses = Object.entries(meta.clause_categories).filter(([, count]) => count > 0);
 
@@ -120,9 +121,14 @@ export default function DocumentCard({ doc, onReset }: DocumentCardProps) {
         <p className="callout warning">No extractable text on pages: {doc.empty_pages.join(", ")}</p>
       )}
 
-      <button type="button" className="btn-secondary" onClick={onReset}>
-        Upload another PDF
-      </button>
+      <div className="doc-actions">
+        <button type="button" className="btn-secondary" onClick={onNewChat}>
+          New chat on this document
+        </button>
+        <button type="button" className="btn-secondary" onClick={onReset}>
+          Upload another PDF
+        </button>
+      </div>
     </section>
   );
 }

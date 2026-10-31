@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from app.config import settings
 from app.dependencies import get_document_store
 from app.schemas import DocumentInfo
-from app.services.document_store import DocumentStore
+from app.services.document_store import DocumentStore, StoredDocument
 from app.services.pdf_processing import PdfProcessingError
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -35,7 +35,10 @@ def upload_document(
 
     if not doc.chunks:
         raise HTTPException(422, "No extractable text was found in this PDF.")
+    return to_document_info(doc)
 
+
+def to_document_info(doc: StoredDocument) -> DocumentInfo:
     return DocumentInfo(
         document_id=doc.document_id,
         filename=doc.filename,

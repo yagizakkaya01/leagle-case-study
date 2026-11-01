@@ -19,7 +19,7 @@ in the Azurite emulator on the server).
 | Answer + page number + reference text | ✅ structured output, checked against the document by code |
 | React chat UI showing answer, page and reference | ✅ the page and a one-line quote sit under each answer; "Show evidence" opens the original PDF page with the quote highlighted |
 | **Bonus:** persistent chat history (PostgreSQL via LangChain) | ✅ `PostgresChatMessageHistory`, reloadable from a sidebar |
-| **Bonus:** cloud document storage (Azure Blob) | ✅ Azure Blob SDK; Azurite emulator in Docker |
+| **Bonus:** cloud document storage (Azure Blob) | Azure Blob SDK, tested on Azurite (the emulator); not tried with a real Azure account |
 | **Bonus:** cloud-backed conversations | ✅ each conversation is bound to its PDF; both reload on click |
 | **Bonus:** streaming responses | Partial: Server-Sent Events show each tool step live; with the default model the answer text arrives in one piece at the end ([details](#4-streaming)) |
 

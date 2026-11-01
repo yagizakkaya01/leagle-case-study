@@ -342,7 +342,8 @@ docker-compose.yml          frontend, backend, PostgreSQL, Azurite
 
 - **Why tool calling for a single PDF?** Putting retrieved text into the prompt and
   asking for a page number lets the model invent pages and quotes. With tools, every
-  citation is traceable to a chunk the code returned, and the code verifies it.
+  citation is traceable to a chunk the code returned, and the code checks it. This is a
+  design argument; it was not compared against a simpler design.
 - **Rules where rules are enough.** Headings, clause categories and case numbers
   are deterministic and free; the LLM is used once per upload for fields rules cannot
   read (parties, summary).
@@ -370,14 +371,19 @@ The same code runs locally and as a public demo; only configuration differs.
   documents, their files in Blob storage and all conversations about them.
 - **Banner:** `DEMO_NOTICE` asks visitors not to upload confidential documents.
 
-### Deliberately left out
+### Scope
 
-Over-engineering was explicitly discouraged, so these were skipped on purpose:
+The case discourages over-engineering, and parts of this project go beyond what it asks:
+hybrid search with a reranker and cross-reference linking, the tool-calling loop and the
+evidence viewer that highlights the quote on the PDF page. They were kept because rewriting
+or removing them close to the deadline risked new bugs, not because a comparison showed
+they were needed; no comparison against a simpler design was run.
+
+Left out:
 
 - **Alembic migrations:** two small tables are created with SQLAlchemy `create_all`.
-- **MMR, OCR, multi-provider LLM fallback:** useful at scale, not for one PDF.
-  A failed metadata call falls back to rule-based fields; a failed chat call is reported
-  to the user, who can ask again.
+- **MMR, OCR, multi-provider LLM fallback:** not added. A failed metadata call falls back
+  to rule-based fields; a failed chat call is reported to the user, who can ask again.
 - **User accounts:** conversations are scoped to an anonymous browser id instead.
 - **Content-level duplicate detection:** duplicates are detected by file hash only, so
   a re-saved copy of the same document counts as a new upload.

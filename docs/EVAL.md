@@ -278,11 +278,13 @@ to the merged order.
 not better answers. The answers in round 3 were already right on nearly every question.
 The documents are short and synthetic, so longer contracts may behave differently.
 
-**Section headings in search.** Search now also reads a chunk's section heading. Measured
-at production settings (five results, 15 candidates), this changed nothing: right page first
-29/40 without rerank and 33/40 with it, with or without headings. That says little either
-way, because these sections are short and most chunks already start with their heading. It
-is meant for long clauses split across chunks, which only a unit test covers.
+**Section headings in search (removed).** Search was changed to also read a chunk's section
+heading. Measured at production settings (five results, 15 candidates), this changed nothing:
+right page first 29/40 without rerank and 33/40 with it, with or without headings. That says
+little either way, because these sections are short and most chunks already start with their
+heading (it changed the search text of 2 of the 42 chunks). It was meant for long clauses
+split across chunks, which only a unit test covered. It was removed in the cleanup after an
+independent review, because nothing measured supported keeping it.
 
 **Short chat check with these changes.** Nine hand-picked questions, one run each: six whose
 order the reranker changed, one that used several sources, one unanswerable and the prompt

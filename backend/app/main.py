@@ -64,11 +64,10 @@ app.include_router(conversations.router)
 
 @app.get("/api/settings", tags=["settings"])
 def public_settings() -> dict:
-    """What the UI needs to know about this deployment (demo banner, limits)."""
+    """What the UI needs to know about this deployment (demo banner and retention)."""
     return {
         "demo_notice": settings.DEMO_NOTICE or None,
         "retention_hours": settings.RETENTION_HOURS or None,
-        "max_upload_mb": settings.MAX_UPLOAD_MB,
     }
 
 

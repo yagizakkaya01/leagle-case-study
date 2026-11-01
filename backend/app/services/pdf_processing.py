@@ -34,7 +34,8 @@ class ProcessedPdf:
     chunks: list[Document]
     pages: list[str]  # extracted text per page, index 0 = page 1
     outline: list[tuple[str, int]] = field(default_factory=list)  # (heading, page)
-    empty_pages: list[int] = field(default_factory=list)  # 1-based
+    # 1-based pages with fewer than 8 real words of text (often scanned pages)
+    empty_pages: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -61,11 +62,11 @@ def split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
     return chunks
 
 
-def is_valid_chunk(text: str) -> bool:
+def is_valid_chunk(text: str, min_words: int = _MIN_REAL_WORDS) -> bool:
     """Reject chunks that are only page numbers, bullets or whitespace."""
     cleaned = re.sub(r"^\s*[-➢•▪▸►]\s*$", "", text, flags=re.MULTILINE)
     cleaned = re.sub(r"^\s*\d{1,4}\s*$", "", cleaned, flags=re.MULTILINE)
-    return len(cleaned.split()) >= _MIN_REAL_WORDS
+    return len(cleaned.split()) >= min_words
 
 
 def split_into_sections(
@@ -154,23 +155,26 @@ def process_pdf(
 
     sections = split_into_sections(pages, large_lines)
     chunks: list[Document] = []
-    pages_with_chunks: set[int] = set()
     page_chunk_counter: dict[int, int] = {}
     for section in sections:
+        # Text at the top of a page continues the previous page's clause, so even a short
+        # tail ("thirty days.") is kept; other short sections are headings or noise.
+        continues_page = section.page > 1 and not section.starts_with_heading
+        min_words = 1 if continues_page else _MIN_REAL_WORDS
         for text in split_text("\n".join(section.lines), chunk_size, overlap):
-            if not is_valid_chunk(text):
+            if not is_valid_chunk(text, min_words):
                 continue
             index = page_chunk_counter.get(section.page, 0)
             page_chunk_counter[section.page] = index + 1
             chunks.append(_chunk_document(
                 text, section, document_id=document_id, filename=filename, index=index
             ))
-            pages_with_chunks.add(section.page)
 
     return ProcessedPdf(
         page_count=len(pages),
         chunks=chunks,
         pages=pages,
         outline=[(s.heading, s.page) for s in sections if s.starts_with_heading],
-        empty_pages=[n for n in range(1, len(pages) + 1) if n not in pages_with_chunks],
+        # Judged on the page's own text: a page with only a footer is still reported.
+        empty_pages=[n for n, text in enumerate(pages, start=1) if not is_valid_chunk(text)],
     )

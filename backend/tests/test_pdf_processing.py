@@ -64,6 +64,33 @@ def test_sections_split_at_headings_and_carry_over_pages():
     assert sections[1].lines == [page2]
 
 
+def test_short_tail_at_the_top_of_a_page_is_kept():
+    result = _process(make_pdf([
+        "3. Fees and Payment\nThe Client shall pay a monthly fee of 18,500 euros. Invoices are "
+        "payable within",
+        "thirty days.\n4. Service Levels\nThe Provider shall keep the platform available "
+        "99.5 percent of each calendar month.",
+    ]))
+    [tail] = [c for c in result.chunks if c.page_content == "thirty days."]
+    assert (tail.metadata["page"], tail.metadata["clause_number"]) == (2, "3")
+
+
+def test_heading_alone_is_still_not_a_chunk():
+    result = _process(make_pdf([
+        "ARTICLE 4 - TERMINATION\n4.1 Termination for Convenience\n"
+        "Either party may terminate this Agreement on ninety days written notice."
+    ]))
+    assert [c.page_content.split("\n")[0] for c in result.chunks] == [
+        "4.1 Termination for Convenience"
+    ]
+
+
+def test_page_with_only_a_footer_is_reported_as_empty():
+    # e.g. a scanned annex whose only text layer is the page footer
+    result = _process(make_pdf([CLAUSE, "Page 2 of 2"]))
+    assert result.empty_pages == [2]
+
+
 def test_process_pdf_rejects_too_many_pages():
     with pytest.raises(PdfProcessingError, match="limit is 1"):
         _process(make_pdf([CLAUSE, CLAUSE]), max_pages=1)

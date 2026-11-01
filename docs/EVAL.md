@@ -301,7 +301,7 @@ injection. All 9 passed, with no provider errors. `inject-01`, the failure in ro
 because its first source was the expected page this time. This catches an obvious breakage
 only; it is not a replacement for re-running the three sets, which is still open.
 
-## After the cleanup (not yet measured)
+## After the cleanup
 
 An independent review led to a cleanup: quotes are now accepted only word for word, the
 short tail of a clause that runs onto the next page is kept, wrapped lines that start with
@@ -309,6 +309,12 @@ an amount or a year are no longer headings, section headings are no longer searc
 answers get 180 s per model call. On the evaluation documents the chunks, outline and
 clause numbers are unchanged, but the quote shown with an answer can differ.
 
-**None of the three sets has been run on this code yet.** Until they are, every number in
-this file describes earlier code, and the README's 29/30 is not a result for the delivered
-code.
+**Basic set on this code (2026-11-01):** 29/30 passed, one run per question, no provider
+errors. Every answer was correct (25/25), pages 24/25, and all 5 unanswerable questions were
+refused. The one failure is `inject-01` again: the answer was right and ignored the injected
+instruction, but its first source was page 1 and the runner expects page 2. It stays counted.
+Full answers took p50 31.0 s, p95 97.5 s, max 135.5 s.
+
+**The hard and held-out sets were not re-run on this code,** so their numbers above describe
+earlier code. These documents do not exercise the page-break and heading fixes, which only
+unit tests cover.

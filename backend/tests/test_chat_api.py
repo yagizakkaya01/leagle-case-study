@@ -109,16 +109,28 @@ def test_a_streamed_answer_logs_under_its_request_id(setup, caplog):
     assert answer.request_id == res.headers["x-request-id"]
 
 
-def test_model_failure_is_logged_with_its_cause(setup, caplog):
-    client, doc, _ = setup
-    class Broken:
-        def ask(self, *_):
-            raise TimeoutError("no reply")
-    app.dependency_overrides[get_chat_service] = Broken
+class _BrokenChat:
+    """Fails the way a database outage would, not the model."""
 
-    assert client.post("/api/chat", json=_body(doc.document_id)).status_code == 502
-    failure = next(r for r in caplog.records if "model call failed" in r.getMessage())
-    assert "error=TimeoutError" in failure.getMessage() and failure.exc_info
+    def ask(self, *_):
+        raise ConnectionError("database is down")
+
+    def ask_stream(self, *_):
+        raise ConnectionError("database is down")
+        yield
+
+
+def test_failure_is_logged_with_its_cause_without_blaming_the_model(setup, caplog):
+    client, doc, _ = setup
+    app.dependency_overrides[get_chat_service] = _BrokenChat
+
+    res = client.post("/api/chat", json=_body(doc.document_id))
+    assert res.status_code == 502
+    assert res.json()["detail"] == "The answer could not be produced. Please try again."
+    stream = client.post("/api/chat/stream", json=_body(doc.document_id))
+    assert "event: error" in stream.text and "The answer could not be produced" in stream.text
+    failure = next(r for r in caplog.records if "answer failed" in r.getMessage())
+    assert "error=ConnectionError" in failure.getMessage() and failure.exc_info
 
 
 def test_rejections_and_document_paths_are_logged(setup, caplog):

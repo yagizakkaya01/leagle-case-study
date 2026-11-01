@@ -278,7 +278,7 @@ INFO app.logging_config          [3f9a1c7e] request method=POST path=/api/chat/s
 
 | Looking for | Search for |
 |---|---|
-| Model errors (with traceback) and rate limits | `model call failed`, `model rate limited` |
+| Failed answers (with traceback; model, database or code) and model rate limits | `answer failed`, `model rate limited` |
 | Requests the API refused, with the reason | `rejected status=` |
 | Citations code had to correct or remove | `quote replaced`, `source dropped`, `answer rejected` |
 | A quote that could not be drawn on the page | `highlight found nothing` |

@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 TITLE_CHARS = 80
-LLM_FAILED = "The language model did not respond. Please try again."
+ANSWER_FAILED = "The answer could not be produced. Please try again."
 LLM_RATE_LIMITED = "The free language model is rate limited. Please try again in a few minutes."
 
 Store = Annotated[DocumentStore, Depends(get_document_store)]
@@ -47,12 +47,16 @@ def _prepare(body: ChatRequest, store: DocumentStore, repo: Repository,
 
 
 def _failure_detail(exc: Exception) -> str:
-    """What the user is told; the cause goes to the log."""
+    """What the user is told; the cause goes to the log.
+
+    Only a 429 is known to come from the model; anything else (the model, the database, a
+    bug) gets the same neutral message.
+    """
     if "[429]" in str(exc):  # how the NVIDIA client reports the status code
         log.warning("model rate limited")
         return LLM_RATE_LIMITED
-    log.error("model call failed error=%s", type(exc).__name__, exc_info=exc)
-    return LLM_FAILED
+    log.error("answer failed error=%s", type(exc).__name__, exc_info=exc)
+    return ANSWER_FAILED
 
 
 def _remember(repo: Repository, body: ChatRequest) -> None:

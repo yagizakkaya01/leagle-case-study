@@ -76,6 +76,16 @@ class DocumentInfo(BaseModel):
 
 # --- Chat ---------------------------------------------------------------------
 
+class SourceClaim(BaseModel):
+    """One point of an answer and the passage it comes from."""
+
+    point: str | None = Field(None, description="Short label of the point, e.g. the risk's name")
+    chunk_id: str = Field(description="chunk_id of the chunk that supports this point")
+    reference_text: str | None = Field(
+        None, description="Exact sentence (max ~40 words) from that chunk that states the point"
+    )
+
+
 class FinalAnswer(BaseModel):
     """Call exactly once to give the final answer to the user."""
 
@@ -85,8 +95,21 @@ class FinalAnswer(BaseModel):
     chunk_id: str | None = Field(None, description="chunk_id of the chunk that supports it")
     page_number: int | None = Field(None, description="Page of that chunk")
     reference_text: str | None = Field(
-        None, description="Short exact quote (max ~40 words) copied from that chunk"
+        None, description="Exact sentence (max ~40 words) from that chunk that states the answer"
     )
+    sources: list[SourceClaim] = Field(
+        default_factory=list,
+        description="Only when the answer makes several points from different passages, "
+                    "e.g. a list of risks: one entry per point, in the answer's order",
+    )
+
+
+class Source(BaseModel):
+    """A checked citation: the page comes from the chunk, the quote is in its text."""
+
+    point: str | None = None
+    page_number: int
+    reference_text: str
 
 
 class ChatRequest(BaseModel):
@@ -106,6 +129,7 @@ class ChatAnswer(BaseModel):
     page_number: int | None
     reference_text: str | None
     found: bool
+    sources: list[Source] = Field(default_factory=list)  # the first is page_number/reference_text
     tool_calls: list[ToolCallInfo] = Field(default_factory=list)
     elapsed_seconds: float = 0.0
 
@@ -126,6 +150,7 @@ class StoredMessage(BaseModel):
     found: bool | None = None
     page_number: int | None = None
     reference_text: str | None = None
+    sources: list[Source] = Field(default_factory=list)
 
 
 class ConversationDetail(BaseModel):

@@ -79,13 +79,13 @@ ruff check .
 ```
 
 **Answer quality** is measured separately against the real model with a 30-question gold
-set (`python -m eval`): 30/30 passed, page numbers 25/25 correct, no citations for the 5
-unanswerable questions, a prompt injection in the document ignored. A second, harder
+set (`python -m eval`): 29/30 passed in the latest run, with every answer correct, page
+numbers 24/25 correct, no citations for the 5 unanswerable questions and a prompt injection
+in the document ignored. A second, harder
 set built on reported legal-RAG failure modes exposed two problems that are now fixed
 (superseded terms after amendments; tool calls lost in streamed turns). Method, results,
-speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md). The latest full
-re-run did not finish because of the free endpoint's rate limit; that file says what was
-and was not measured.
+speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md), including why
+the one failure stays counted and an unexplained slowdown in that run.
 
 Chat tests run against a scripted fake chat model. Setting `TEST_DATABASE_URL` and
 `TEST_AZURE_CONNECTION_STRING` (values in `.github/workflows/ci.yml`) also runs the
@@ -159,6 +159,11 @@ It finishes by calling a `FinalAnswer` tool with `answer`, `chunk_id`, `page_num
 - a date or number the answer states must be in the quote when the chunk has it;
 - a claim with no supporting chunk is replaced by "could not find a passage…".
 
+An answer that makes several points from different passages, such as a list of risks,
+also fills `sources`, one entry per point. Each entry passes the same checks and gets its
+own "Show evidence" button; an entry that fails them loses its button. `page_number` and
+`reference_text` always hold the first source.
+
 The model chooses and phrases the answer; code decides what counts as its source. The
 UI also lists the tool calls behind each answer ("How this answer was found").
 
@@ -192,7 +197,7 @@ reports progress through a callback while the chain runs in a worker thread):
 ```
 event: tool    data: {"name": "search_document", "args": {"query": "termination notice"}}
 event: delta   data: {"text": "Either party may…"}
-event: final   data: {answer, page_number, reference_text, found, tool_calls, elapsed_seconds}
+event: final   data: {answer, page_number, reference_text, found, sources, tool_calls, elapsed_seconds}
 event: error   data: {"detail": "…"}
 ```
 
@@ -213,7 +218,7 @@ answer is replaced in the UI.
 | `POST` | `/api/documents` | upload a PDF (multipart `file`) → document info + metadata |
 | `GET` | `/api/documents/{id}/file` | the original PDF, for the evidence viewer |
 | `POST` | `/api/documents/{id}/highlights` | `{page, quote}` → where the quote sits on the page, in percent of the page |
-| `POST` | `/api/chat` | `{document_id, session_id, client_id, question}` → `{answer, page_number, reference_text, found, tool_calls, elapsed_seconds}` |
+| `POST` | `/api/chat` | `{document_id, session_id, client_id, question}` → `{answer, page_number, reference_text, found, sources, tool_calls, elapsed_seconds}` |
 | `POST` | `/api/chat/stream` | same body; Server-Sent Events (`tool`, `delta`, `final`, `error`) |
 | `GET` | `/api/conversations?client_id=` | saved conversations, newest first |
 | `GET` | `/api/conversations/{id}?client_id=` | document + stored messages with citations |
@@ -242,6 +247,35 @@ All settings live in `backend/.env` (see [`.env.example`](backend/.env.example))
 | `TRUSTED_PROXY_HOPS` | `0` (`1` in Docker) | reverse proxies in front, used to read the real client IP |
 | `RETENTION_HOURS` | `0` | delete documents and their chats after N hours; `0` = keep |
 | `DEMO_NOTICE` | empty | banner text shown in the UI (public demo) |
+| `LOG_LEVEL` | `INFO` | backend log level |
+
+## Logs
+
+```bash
+docker compose logs -f backend
+```
+
+Each request gets an id, returned in the `X-Request-ID` header and repeated on every line
+it causes, so `grep 3f9a1c7e` shows one question from start to end:
+
+```
+INFO app.services.document_store [a81c04b9] document processed doc=90c9bf102b3f pages=17 chunks=45 empty_pages=0 bytes=184233 metadata_reused=False ms=2140
+INFO app.services.grounding      [3f9a1c7e] quote replaced reason=not_in_chunk chunk=90c9bf102b3f-p13-c1 match=62
+INFO app.services.chat           [3f9a1c7e] answer doc=90c9bf102b3f conversation=57e1ac0d-… found=True sources=3 model_turns=3 tools=search_document,find_clauses model_ms=14210 tool_ms=380
+INFO app.logging_config          [3f9a1c7e] request method=POST path=/api/chat/stream status=200 ms=14650
+```
+
+| Looking for | Search for |
+|---|---|
+| Model errors (with traceback) and rate limits | `model call failed`, `model rate limited` |
+| Requests the API refused, with the reason | `rejected status=` |
+| Citations code had to correct or remove | `quote replaced`, `source dropped`, `answer rejected` |
+| A quote that could not be drawn on the page | `highlight found nothing` |
+| Whether the model or the tools were slow | `model_ms`, `tool_ms` on the `answer` line |
+
+Documents can be confidential, so these lines hold counts and short ids: never the question,
+the answer, a quote, a filename or a full document id. A traceback can still repeat error
+text returned by the model provider.
 
 ## Project structure
 

@@ -6,13 +6,14 @@ import threading
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import chat, conversations, documents
 from app.config import settings
 from app.dependencies import get_document_store
-from app.logging_config import setup_logging
+from app.logging_config import RequestLogMiddleware, setup_logging
 
 setup_logging()
 log = logging.getLogger(__name__)
@@ -47,6 +48,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestLogMiddleware)  # added last: outermost, so it times everything
+
+
+@app.exception_handler(HTTPException)
+async def log_rejection(request: Request, exc: HTTPException):
+    log.info("rejected status=%d detail=%r", exc.status_code, exc.detail)
+    return await http_exception_handler(request, exc)
+
+
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)

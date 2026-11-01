@@ -59,11 +59,19 @@ export interface ToolCallInfo {
   args: Record<string, unknown>;
 }
 
+// A verified citation; `point` names what it supports when an answer has several
+export interface Source {
+  point: string | null;
+  page_number: number;
+  reference_text: string;
+}
+
 export interface ChatAnswer {
   answer: string;
   page_number: number | null; // 1-based, verified by backend
   reference_text: string | null; // short quote from the document, verified
   found: boolean; // false when the document does not contain the answer
+  sources: Source[]; // one per point; the first matches page_number/reference_text
   tool_calls: ToolCallInfo[]; // tools the model used, in order
   elapsed_seconds: number;
 }
@@ -83,6 +91,7 @@ export interface StoredMessage {
   found: boolean | null;
   page_number: number | null;
   reference_text: string | null;
+  sources: Source[];
 }
 
 export interface ConversationDetail {

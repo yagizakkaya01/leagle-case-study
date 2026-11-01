@@ -14,6 +14,7 @@ in a worker thread; the verified answer is always the last event.
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import queue
@@ -36,6 +37,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.utils.json import parse_partial_json
 from pydantic import ValidationError
 
+from app.logging_config import short_id
 from app.schemas import ChatAnswer, FinalAnswer, ToolCallInfo
 from app.services.chunk_metadata import CLAUSE_KEYWORDS
 from app.services.document_store import StoredDocument
@@ -63,8 +65,14 @@ RULES
 3. Finish by calling FinalAnswer exactly once:
    - answer: concise, in the language of the user's question.
    - chunk_id: the chunk that best supports the answer, exactly as a tool returned it.
-   - reference_text: a short quote copied word for word from that chunk.
+   - reference_text: the sentence of that chunk that states the answer, copied word for
+     word. For a risk or an obligation, quote the wording that creates it, not a heading
+     or a reference to a law.
    - page_number: that chunk's page.
+   - sources: only when the answer makes several points from different passages, for
+     example a list of risks. Give one entry per point, in the answer's order, with a
+     short label, its chunk_id and its own quote, so that every point can be checked.
+     chunk_id, reference_text and page_number then repeat the first entry.
 4. If the tools return nothing that answers the question, call FinalAnswer with
    found=false and say the document does not contain it. Do not guess.
 5. Results marked "linked" are passages that refer to the same clause, or that the
@@ -95,7 +103,7 @@ class ChatService:
             emit: Emit | None = None) -> ChatAnswer:
         started = time.perf_counter()
         result = self._chain.invoke(
-            {"question": question, "doc": doc, "emit": emit},
+            {"question": question, "doc": doc, "emit": emit, "conversation": conversation_id},
             config={"configurable": {"session_id": conversation_id}},
         )
         answer: ChatAnswer = result["result"]
@@ -120,7 +128,8 @@ class ChatService:
             finally:
                 events.put(done)
 
-        threading.Thread(target=run, daemon=True).start()
+        # copy_context: the thread's log lines keep this request's id
+        threading.Thread(target=contextvars.copy_context().run, args=(run,), daemon=True).start()
         while (event := events.get()) is not done:
             if isinstance(event, Exception):
                 raise event
@@ -143,13 +152,19 @@ class ChatService:
         ]
         calls: list[ToolCallInfo] = []
         final: FinalAnswer | None = None
+        model_seconds = tool_seconds = 0.0
+        turns = 0
 
         for round_number in range(MAX_TOOL_ROUNDS):
             model = forced if round_number == MAX_TOOL_ROUNDS - 1 else free
+            started = time.perf_counter()
             reply = _stream_reply(model, messages, emit) if emit else model.invoke(messages)
+            model_seconds += time.perf_counter() - started
+            turns += 1
             messages.append(reply)
             if not reply.tool_calls:
                 # Plain text without the FinalAnswer tool: shown, but never as grounded.
+                log.info("model replied without FinalAnswer turn=%d", turns)
                 final = FinalAnswer(answer=_text(reply), found=False)
                 break
             for call in reply.tool_calls:
@@ -159,22 +174,25 @@ class ChatService:
                 calls.append(ToolCallInfo(name=call["name"], args=call["args"]))
                 if emit:
                     emit({"type": "tool", "name": call["name"], "args": call["args"]})
+                started = time.perf_counter()
                 messages.append(ToolMessage(
                     content=_run_tool(tools, call["name"], call["args"]),
                     tool_call_id=call["id"],
                 ))
+                tool_seconds += time.perf_counter() - started
             if final is not None:
                 break
 
-        checked = verify(final or FinalAnswer(answer="", found=False), evidence.chunks)
-        result = ChatAnswer(
-            answer=checked.answer or "Sorry, I could not produce an answer.",
-            page_number=checked.page_number,
-            reference_text=checked.reference_text,
-            found=checked.found,
-            tool_calls=calls,
-        )
-        citation = result.model_dump(include={"found", "page_number", "reference_text"})
+        result = verify(final or FinalAnswer(answer="", found=False), evidence.chunks)
+        result.answer = result.answer or "Sorry, I could not produce an answer."
+        result.tool_calls = calls
+        log.info("answer doc=%s conversation=%s found=%s sources=%d model_turns=%d tools=%s "
+                 "model_ms=%d tool_ms=%d", short_id(doc.document_id), inputs["conversation"],
+                 result.found, len(result.sources), turns,
+                 ",".join(c.name for c in calls) or "-",
+                 model_seconds * 1000, tool_seconds * 1000)
+        citation = result.model_dump(
+            include={"found", "page_number", "reference_text", "sources"})
         return {"answer": AIMessage(result.answer, additional_kwargs=citation), "result": result}
 
     @staticmethod
@@ -236,7 +254,7 @@ def _run_tool(tools: dict, name: str, args: dict) -> str:
     try:
         return tools[name].invoke(args)
     except Exception as exc:  # bad arguments from the model; let it retry
-        log.info("Tool %s failed: %s", name, exc)
+        log.info("tool failed name=%s error=%s", name, type(exc).__name__)
         return f"Tool error: {exc}"
 
 
@@ -244,7 +262,7 @@ def _parse_final(args: dict) -> FinalAnswer:
     try:
         return FinalAnswer(**args)
     except ValidationError:  # malformed arguments: keep the text, never the citation
-        log.info("Malformed FinalAnswer arguments: %s", args)
+        log.info("malformed FinalAnswer fields=%s", ",".join(args))
         return FinalAnswer(answer=str(args.get("answer", "")), found=False)
 
 

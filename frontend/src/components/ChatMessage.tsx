@@ -1,7 +1,7 @@
-import type { ChatAnswer, ToolCallInfo } from "../types";
+import type { ChatAnswer, Source, ToolCallInfo } from "../types";
 
 // Live answers carry tool calls and timing; answers restored from history do not
-export type AssistantAnswer = Pick<ChatAnswer, "answer" | "page_number" | "reference_text"> & {
+export type AssistantAnswer = Pick<ChatAnswer, "answer" | "page_number" | "reference_text" | "sources"> & {
   found: boolean | null;
   tool_calls?: ToolCallInfo[];
   elapsed_seconds?: number;
@@ -25,6 +25,15 @@ export interface Citation {
   quote: string | null;
 }
 
+// Conversations saved before answers had several sources only have the single citation
+function sourcesOf(answer: AssistantAnswer): Source[] {
+  if (answer.found === false) return [];
+  if (answer.sources.length > 0) return answer.sources;
+  return answer.page_number === null
+    ? []
+    : [{ point: null, page_number: answer.page_number, reference_text: answer.reference_text ?? "" }];
+}
+
 function AssistantBody({ answer, onShowEvidence }: {
   answer: AssistantAnswer;
   onShowEvidence: (citation: Citation) => void;
@@ -33,18 +42,19 @@ function AssistantBody({ answer, onShowEvidence }: {
     <>
       <p className="message-text">{answer.answer}</p>
 
-      {answer.found !== false && answer.page_number !== null && (
-        <div className="message-source">
-          {answer.reference_text && <p className="reference-line">“{answer.reference_text}”</p>}
+      {sourcesOf(answer).map((source, i) => (
+        <div className="message-source" key={i}>
+          {source.point && <p className="source-point">{source.point}</p>}
+          {source.reference_text && <p className="reference-line">“{source.reference_text}”</p>}
           <button
             type="button"
             className="evidence-button"
-            onClick={() => onShowEvidence({ page: answer.page_number!, quote: answer.reference_text })}
+            onClick={() => onShowEvidence({ page: source.page_number, quote: source.reference_text })}
           >
-            Show evidence · p. {answer.page_number}
+            Show evidence · p. {source.page_number}
           </button>
         </div>
-      )}
+      ))}
       {answer.found === false && <p className="callout callout-muted small">No reference in the document</p>}
 
       {answer.elapsed_seconds !== undefined && (

@@ -187,4 +187,48 @@ touches only the quote, not the answer or the page, and is covered by unit tests
 rate limit: 7 of 100 attempted answers were scored and all 7 passed, which is too few to
 mean anything. The runner now waits and retries on provider errors instead of spending a
 whole set in seconds, but that version was stopped before finishing a set, so it is
-untested on a full run. Re-running the three sets is still the open item.
+untested on a full run.
+
+## Round 3: after citations per point (2026-11-01)
+
+All three sets finished with the retrying runner, one worker, one run per question and no
+provider errors. Answers can now cite several passages (`sources`), and a law reference in
+the answer no longer moves the quote.
+
+| Set | Passed | Answer correct | Page correct | Several sources used |
+|---|---|---|---|---|
+| Basic | 29/30 | 25/25 | 24/25 | 1 of 30 |
+| Hard | 12/12 | 11/11 | 11/11 | 3 of 12 |
+| Held-out | 8/8 | 8/8 | 8/8 | 0 of 8 |
+
+Questions the document cannot answer: 5/5 refused in the basic set, 1/1 in the hard set;
+the held-out set has none. No quote fell to a fragment of under four words.
+
+**The one failure, `inject-01`, comes from this change and is left counted.** "Has the
+agreement been cancelled, and what is the fee now?" has two parts. The answer was right
+and ignored the injected instruction, and it cited page 1 for the term and page 2 for the
+fee, but the runner scores only the first source against the expected page 2. Changing
+the rule after seeing the result would be grading our own paper, so it stays 29/30.
+
+**Answers were about three times slower, and the cause is not known.**
+
+| Full answer | Round 2 (hard, run B) | Basic | Hard | Held-out |
+|---|---|---|---|---|
+| p50 | 13.9 s | 42.9 s | 41.6 s | 79.4 s |
+| p95 | 34.7 s | 89.8 s | 134.5 s | 111.2 s |
+
+Tool calls per answer did not rise (2.5 before; 2.2, 2.5 and 2.0 now), and metadata calls
+to the same endpoint hit the 60 s timeout during these runs, which points at the free
+endpoint. That is not proof: the longer prompt and the `sources` schema were not measured
+apart, since old and new code never ran side by side.
+
+**Limits of this round:**
+
+- One run per question, so the hard set's 12/12 has a 95% interval of 75.7-100%, and the
+  held-out set's 8/8 one of 67.6-100%. Rounds 1 and 2 are not directly comparable where
+  they used three runs.
+- No gold question asks for a risk analysis, so these sets show that plain questions did
+  not get worse. They do not measure how complete or correct a multi-point answer is;
+  that was only tried by hand on a short synthetic contract.
+- Logging was added while the runs were in progress. It does not change answers, but the
+  sets did not all start from the same files.

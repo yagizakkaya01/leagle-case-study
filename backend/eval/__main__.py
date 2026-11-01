@@ -140,7 +140,9 @@ def run_one(chat: ChatService, docs: dict[str, StoredDocument], gold: dict, run:
     return {
         **base, "question": gold["question"], "expected_pages": gold["pages"],
         "page": answer.page_number, "found": answer.found, "answer": answer.answer,
-        "reference_text": answer.reference_text, "tools": [t.name for t in answer.tool_calls],
+        "reference_text": answer.reference_text,
+        "sources": [s.model_dump() for s in answer.sources],
+        "tools": [t.name for t in answer.tool_calls],
         "latency": round(latency, 2), "first_event": round(first_event or latency, 2),
         "tool_count": len(answer.tool_calls), **score(gold, answer),
     }

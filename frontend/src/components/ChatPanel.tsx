@@ -35,6 +35,7 @@ function toEntries(stored: StoredMessage[]): ChatEntry[] {
             found: msg.found,
             page_number: msg.page_number,
             reference_text: msg.reference_text,
+            sources: msg.sources,
           },
         },
   );

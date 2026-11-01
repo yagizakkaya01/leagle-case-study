@@ -235,3 +235,101 @@ def test_quote_stays_when_the_chunk_lacks_the_number():
     final = FinalAnswer(answer="In total 128 days.", chunk_id="c1",
                         reference_text="Exit Type : Recovered and discharged")
     assert verify(final, {"c1": FORM}).reference_text == "Exit Type : Recovered and discharged"
+
+
+CLAUSE = Document(
+    page_content=(
+        "Yönetim Kurulu, Şirketin devamını tehlikeye düşüren sebeplerin erken teşhisi için\n"
+        "uzman bir komite kurmaya ve bu komitenin çalışma esaslarını belirlemeye\n"
+        "yetkilidir (TTK m. 378).\n"
+        "Madde 31 — İlanlar\n"
+        "Toplantı ilanları en az 15 gün önce yapılır."
+    ),
+    metadata={"chunk_id": "c1", "page": 13},
+)
+
+
+def test_a_law_reference_in_the_answer_does_not_move_the_quote():
+    final = FinalAnswer(answer="Komite kurmak zorunlu değil (TTK m. 378, Madde 31).", chunk_id="c1",
+                        reference_text="uzman bir komite kurmaya")
+    assert verify(final, {"c1": CLAUSE}).reference_text == "uzman bir komite kurmaya"
+
+
+def test_replacement_quote_is_the_whole_wrapped_sentence():
+    final = FinalAnswer(answer="Erken teşhis komitesi kurulabilir.", chunk_id="c1",
+                        reference_text="Bu metin belgede hiç geçmiyor, tamamen uydurma.")
+    quote = verify(final, {"c1": CLAUSE}).reference_text
+    assert quote.startswith("Yönetim Kurulu") and quote.endswith("(TTK m. 378).")
+
+
+def test_a_real_value_in_the_answer_still_moves_the_quote():
+    final = FinalAnswer(answer="İlan 15 gün önce yapılır.", chunk_id="c1",
+                        reference_text="uzman bir komite kurmaya")
+    assert verify(final, {"c1": CLAUSE}).reference_text == (
+        "Toplantı ilanları en az 15 gün önce yapılır.")
+
+
+# --- answers with several points --------------------------------------------------
+
+PENALTY = Document(page_content="The Tenant pays a penalty of 5,000 euros for each breach.",
+                   metadata={"chunk_id": "c2", "page": 4})
+NOTICE = Document(page_content="Either party may leave on 90 days notice without any reason.",
+                  metadata={"chunk_id": "c3", "page": 9})
+SEVERAL = {"c2": PENALTY, "c3": NOTICE}
+
+
+def _risks(*claims):
+    return FinalAnswer(answer="Two risks.", sources=[
+        {"point": point, "chunk_id": chunk_id, "reference_text": quote}
+        for point, chunk_id, quote in claims
+    ])
+
+
+def test_each_point_keeps_its_own_page_and_quote():
+    checked = verify(_risks(("Penalty", "c2", "a penalty of 5,000 euros"),
+                            ("Exit", "c3", "leave on 90 days notice")), SEVERAL)
+    assert [(s.point, s.page_number, s.reference_text) for s in checked.sources] == [
+        ("Penalty", 4, "a penalty of 5,000 euros"),
+        ("Exit", 9, "leave on 90 days notice"),
+    ]
+    assert (checked.page_number, checked.reference_text) == (4, "a penalty of 5,000 euros")
+
+
+def test_a_source_no_tool_returned_is_dropped():
+    checked = verify(_risks(("Invented", "made-up", "anything"),
+                            ("Exit", "c3", "leave on 90 days notice")), SEVERAL)
+    assert [s.point for s in checked.sources] == ["Exit"] and checked.page_number == 9
+
+
+def test_main_citation_is_used_when_no_listed_source_checks_out():
+    final = FinalAnswer(answer="One risk.", chunk_id="c3",
+                        reference_text="leave on 90 days notice",
+                        sources=[{"point": "Invented", "chunk_id": "made-up"}])
+    assert verify(final, SEVERAL).page_number == 9
+
+
+def test_no_valid_source_at_all_is_not_shown():
+    checked = verify(_risks(("Invented", "made-up", "anything")), SEVERAL)
+    assert (checked.found, checked.answer, checked.sources) == (False, UNVERIFIED_ANSWER, [])
+
+
+def test_the_same_passage_is_listed_once():
+    checked = verify(_risks(("Penalty", "c2", "a penalty of 5,000 euros"),
+                            ("Cost", "c2", "a penalty of 5,000 euros")), SEVERAL)
+    assert len(checked.sources) == 1
+
+
+def test_a_value_is_looked_for_in_its_own_point():
+    chunk = Document(page_content="Rent is 700 euros a month.\nThe deposit is 300 euros.",
+                     metadata={"chunk_id": "c4", "page": 2})
+    final = FinalAnswer(answer="Rent is 700 and the deposit is 300.", sources=[
+        {"point": "Deposit of 300 euros", "chunk_id": "c4", "reference_text": "Rent is 700 euros"},
+    ])
+    assert verify(final, {"c4": chunk}).reference_text == "The deposit is 300 euros."
+
+
+def test_single_citation_is_also_listed_in_sources():
+    final = FinalAnswer(answer="Ninety days.", chunk_id="x-p2-c0",
+                        reference_text="ninety days written notice")
+    checked = verify(final, {"x-p2-c0": CHUNK})
+    assert [(s.point, s.page_number) for s in checked.sources] == [(None, 2)]

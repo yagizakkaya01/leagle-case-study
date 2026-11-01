@@ -46,8 +46,13 @@ def _prepare(body: ChatRequest, store: DocumentStore, repo: Repository,
     return chat, doc
 
 
-def _is_rate_limited(exc: Exception) -> bool:
-    return "[429]" in str(exc)  # how the NVIDIA client reports the status code
+def _failure_detail(exc: Exception) -> str:
+    """What the user is told; the cause goes to the log."""
+    if "[429]" in str(exc):  # how the NVIDIA client reports the status code
+        log.warning("model rate limited")
+        return LLM_RATE_LIMITED
+    log.error("model call failed error=%s", type(exc).__name__, exc_info=exc)
+    return LLM_FAILED
 
 
 def _remember(repo: Repository, body: ChatRequest) -> None:
@@ -61,9 +66,8 @@ def ask(body: ChatRequest, store: Store, repo: Repo, chat: Chat) -> ChatAnswer:
     try:
         answer = service.ask(doc, str(body.session_id), body.question.strip())
     except Exception as exc:
-        if _is_rate_limited(exc):
-            raise HTTPException(503, LLM_RATE_LIMITED) from exc
-        raise HTTPException(502, LLM_FAILED) from exc
+        detail = _failure_detail(exc)
+        raise HTTPException(503 if detail == LLM_RATE_LIMITED else 502, detail) from exc
     _remember(repo, body)
     return answer
 
@@ -83,9 +87,7 @@ def ask_stream(body: ChatRequest, store: Store, repo: Repo, chat: Chat) -> Strea
                     event = event["answer"].model_dump()
                 yield _sse(kind, event)
         except Exception as exc:
-            log.warning("Streaming answer failed", exc_info=True)
-            yield _sse("error", {"detail": LLM_RATE_LIMITED if _is_rate_limited(exc)
-                                 else LLM_FAILED})
+            yield _sse("error", {"detail": _failure_detail(exc)})
 
     return StreamingResponse(events(), media_type="text/event-stream", headers={
         "Cache-Control": "no-cache",

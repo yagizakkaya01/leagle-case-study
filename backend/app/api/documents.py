@@ -1,6 +1,7 @@
 """PDF upload endpoint."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -9,12 +10,14 @@ from fastapi import Path as PathParam
 
 from app.config import settings
 from app.dependencies import enforce_upload_limit, get_document_store
+from app.logging_config import short_id
 from app.schemas import DocumentInfo, HighlightBox, HighlightRequest
 from app.services.document_store import DocumentStore, StoredDocument
 from app.services.pdf_processing import PdfProcessingError
 from app.services.quote_location import locate_quote
 
-router = APIRouter(prefix="/api/documents", tags=["documents"])
+log = logging.getLogger(__name__)
+router =APIRouter(prefix="/api/documents", tags=["documents"])
 
 
 @router.post("", response_model=DocumentInfo, dependencies=[Depends(enforce_upload_limit)])
@@ -65,7 +68,11 @@ def find_highlights(
     data = store.load_file(document_id)
     if data is None:
         raise HTTPException(404, "The original file is no longer available.")
-    return locate_quote(data, body.page, body.quote)
+    boxes = locate_quote(data, body.page, body.quote)
+    if not boxes:
+        log.info("highlight found nothing doc=%s page=%d quote_chars=%d",
+                 short_id(document_id), body.page, len(body.quote))
+    return boxes
 
 
 def to_document_info(doc: StoredDocument) -> DocumentInfo:

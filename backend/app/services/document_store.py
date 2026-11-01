@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -17,6 +18,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.runnables import Runnable
 
+from app.logging_config import short_id
 from app.schemas import DocumentMetadata
 from app.services.document_metadata import extract_metadata
 from app.services.file_storage import FileStorage
@@ -75,7 +77,12 @@ class DocumentStore:
         # Known from an earlier run: reuse its metadata instead of a new LLM call.
         record = self._repository.get_document(document_id) if self._repository else None
         known = DocumentMetadata.model_validate(record.metadata) if record else None
+        started = time.perf_counter()
         doc = self._build(data, document_id, filename, known)
+        log.info("document processed doc=%s pages=%d chunks=%d empty_pages=%d bytes=%d "
+                 "metadata_reused=%s ms=%d", short_id(document_id), doc.page_count,
+                 len(doc.chunks), len(doc.empty_pages), len(data), known is not None,
+                 (time.perf_counter() - started) * 1000)
         if not doc.chunks:  # the API rejects it; keeping it would escape the retention purge
             return doc
         self._files.save(document_id, data)
@@ -99,6 +106,7 @@ class DocumentStore:
             return None
         meta = DocumentMetadata.model_validate(record.metadata)
         doc = self._build(data, document_id, record.filename, meta)
+        log.info("document restored doc=%s chunks=%d", short_id(document_id), len(doc.chunks))
         with self._lock:
             self._documents[document_id] = doc
         return doc

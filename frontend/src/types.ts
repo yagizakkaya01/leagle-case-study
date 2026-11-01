@@ -42,7 +42,6 @@ export interface DocumentMetadata {
 export interface PublicSettings {
   demo_notice: string | null;
   retention_hours: number | null;
-  max_upload_mb: number;
 }
 
 export interface DocumentInfo {

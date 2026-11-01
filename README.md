@@ -235,7 +235,7 @@ answer is replaced in the UI.
 | `GET` | `/api/conversations?client_id=` | saved conversations, newest first |
 | `GET` | `/api/conversations/{id}?client_id=` | document + stored messages with citations |
 | `DELETE` | `/api/conversations/{id}?client_id=` | delete a conversation and its history |
-| `GET` | `/api/settings` | demo banner text, retention, upload limit for the UI |
+| `GET` | `/api/settings` | demo banner text and retention for the UI |
 | `GET` | `/healthz` | liveness |
 
 Interactive docs: `/docs`.
@@ -256,7 +256,7 @@ All settings live in `backend/.env` (see [`.env.example`](backend/.env.example))
 | `METADATA_TIMEOUT_SECONDS` | `60` | the optional metadata call that the upload waits for |
 | `DATABASE_URL` | empty | PostgreSQL URL for persistent history |
 | `AZURE_STORAGE_CONNECTION_STRING` | empty | Azure Blob (or Azurite) for PDF files |
-| `MAX_UPLOAD_MB` / `MAX_PAGES` | `10` / `50` | upload limits |
+| `MAX_UPLOAD_MB` / `MAX_PAGES` | `10` / `50` | upload limits in the backend; the UI (10 MB) and nginx (11 MB) have their own fixed limits |
 | `CORS_ORIGINS` | `http://localhost:5173` | allowed frontend origins in development |
 | `CHAT_LIMIT_PER_HOUR` / `UPLOAD_LIMIT_PER_HOUR` | `60` / `20` | per client IP; `0` = unlimited |
 | `TRUSTED_PROXY_HOPS` | `0` (`1` in Docker) | reverse proxies in front, used to read the real client IP |

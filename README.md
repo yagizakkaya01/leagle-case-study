@@ -410,6 +410,9 @@ eval questions, mainly to check that plain factual questions do not become over-
   page, so the text at the top of that page loses its clause heading and number.
 - A wrapped line that starts with a date, such as "15 January 2024 between the parties", is
   still taken as a numbered heading (clause 15).
+- Chat history in PostgreSQL uses one long-lived database connection that is not opened
+  again: if the database restarts, chat fails until the backend is restarted. This was
+  found by reading the code, not reproduced.
 - The evidence viewer has no search or text selection. A quote that cannot be located
   (for example, one made only of symbols) opens its page without a highlight, with the
   quote shown above it.

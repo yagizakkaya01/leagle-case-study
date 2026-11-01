@@ -95,7 +95,8 @@ the one failure stays counted and an unexplained slowdown in that run.
 
 Chat tests run against a scripted fake chat model. Setting `TEST_DATABASE_URL` and
 `TEST_AZURE_CONNECTION_STRING` (values in `.github/workflows/ci.yml`) also runs the
-PostgreSQL and Azure Blob variants; CI does this on every push. The frontend is checked
+PostgreSQL and Azure Blob variants; CI does this on pushes to main and on pull requests.
+The frontend is checked
 with `npm run lint` and `npm run build`.
 
 ---

@@ -403,7 +403,11 @@ eval questions, mainly to check that plain factual questions do not become over-
 
 ## Known limitations
 
-- Scanned PDFs without a text layer are not OCR'd; such pages are reported as empty.
+- Scanned PDFs without a text layer are not OCR'd; such pages (fewer than eight words of
+  text) are reported as empty.
+- A line in capitals at the bottom of a page, such as a `STRICTLY CONFIDENTIAL` footer, is
+  taken as a heading. It then replaces the clause heading that carries over to the next
+  page, so the text at the top of that page loses its clause heading and number.
 - The evidence viewer has no search or text selection. A quote that cannot be located
   (for example, one made only of symbols) opens its page without a highlight, with the
   quote shown above it.

@@ -16,7 +16,7 @@ in the Azurite emulator on the server).
 | Upload a single PDF, extract its text | ✅ page-aware extraction with `pdfplumber` |
 | Ask natural-language questions, conversational flow | ✅ LangChain `RunnableWithMessageHistory` |
 | Answer + page number + reference text | ✅ structured output, checked against the document by code |
-| React chat UI showing answer, page and reference | ✅ |
+| React chat UI showing answer, page and reference | ✅ the page and a one-line quote sit under each answer; "Show evidence" opens the original PDF page with the quote highlighted |
 | **Bonus:** persistent chat history (PostgreSQL via LangChain) | ✅ `PostgresChatMessageHistory`, reloadable from a sidebar |
 | **Bonus:** cloud document storage (Azure Blob) | ✅ Azure Blob SDK; Azurite emulator in Docker |
 | **Bonus:** cloud-backed conversations | ✅ each conversation is bound to its PDF; both reload on click |
@@ -203,6 +203,7 @@ answer is replaced in the UI.
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/documents` | upload a PDF (multipart `file`) → document info + metadata |
+| `GET` | `/api/documents/{id}/file` | the original PDF, for the evidence viewer |
 | `POST` | `/api/chat` | `{document_id, session_id, client_id, question}` → `{answer, page_number, reference_text, found, tool_calls, elapsed_seconds}` |
 | `POST` | `/api/chat/stream` | same body; Server-Sent Events (`tool`, `delta`, `final`, `error`) |
 | `GET` | `/api/conversations?client_id=` | saved conversations, newest first |
@@ -324,6 +325,8 @@ This project combines pieces I built and learned in earlier work:
 ## Known limitations
 
 - Scanned PDFs without a text layer are not OCR'd; such pages are reported as empty.
+- The evidence viewer finds the quote by text. If it cannot, the page opens without a
+  highlight and the quote is shown above it. It also has no search or text selection.
 - The free NVIDIA endpoint has variable latency (answers usually take 5–20 s).
 - Turkish is not explicitly listed for the embedding model; keyword search and the
   rule-based metadata cover Turkish documents.

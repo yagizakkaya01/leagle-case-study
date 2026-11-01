@@ -41,6 +41,10 @@ export async function uploadDocument(file: File): Promise<DocumentInfo> {
   return (await response.json()) as DocumentInfo;
 }
 
+export function documentFileUrl(documentId: string): string {
+  return `${API_URL}/api/documents/${encodeURIComponent(documentId)}/file`;
+}
+
 export interface StreamHandlers {
   onTool: (name: string, args: Record<string, unknown>) => void;
   onDelta: (text: string) => void; // append to the answer shown so far

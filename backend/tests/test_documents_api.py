@@ -50,3 +50,20 @@ def test_rejects_non_pdf(client):
 def test_rejects_pdf_without_text(client):
     res = _upload(client, make_pdf(["", ""]))
     assert res.status_code == 422
+
+
+def test_original_file_can_be_read_back(client):
+    data = make_pdf([CLAUSE])
+    document_id = _upload(client, data).json()["document_id"]
+    res = client.get(f"/api/documents/{document_id}/file")
+    assert res.status_code == 200
+    assert res.content == data
+    assert res.headers["content-type"] == "application/pdf"
+
+
+def test_unknown_file_is_not_found(client):
+    assert client.get(f"/api/documents/{'0' * 64}/file").status_code == 404
+
+
+def test_file_id_must_be_a_content_hash(client):
+    assert client.get("/api/documents/not-a-hash/file").status_code == 422

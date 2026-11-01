@@ -101,6 +101,10 @@ class DocumentStore:
             self._documents[document_id] = doc
         return doc
 
+    def load_file(self, document_id: str) -> bytes | None:
+        """The original PDF, for showing a citation on its page."""
+        return self._files.load(document_id)
+
     def purge_older_than(self, cutoff: datetime) -> int:
         """Deletes documents uploaded before `cutoff` with their files and chats."""
         if self._repository is None:

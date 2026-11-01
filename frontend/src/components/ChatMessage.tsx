@@ -20,17 +20,29 @@ function formatToolCall(call: ToolCallInfo): string {
   return `${call.name}(${args})`;
 }
 
-function AssistantBody({ answer }: { answer: AssistantAnswer }) {
+export interface Citation {
+  page: number;
+  quote: string | null;
+}
+
+function AssistantBody({ answer, onShowEvidence }: {
+  answer: AssistantAnswer;
+  onShowEvidence: (citation: Citation) => void;
+}) {
   return (
     <>
       <p className="message-text">{answer.answer}</p>
 
       {answer.found !== false && answer.page_number !== null && (
         <div className="message-source">
-          <span className="source-tag">📄 p. {answer.page_number}</span>
-          {answer.reference_text && (
-            <blockquote className="reference-quote">{answer.reference_text}</blockquote>
-          )}
+          {answer.reference_text && <p className="reference-line">“{answer.reference_text}”</p>}
+          <button
+            type="button"
+            className="evidence-button"
+            onClick={() => onShowEvidence({ page: answer.page_number!, quote: answer.reference_text })}
+          >
+            Show evidence · p. {answer.page_number}
+          </button>
         </div>
       )}
       {answer.found === false && <p className="callout callout-muted small">No reference in the document</p>}
@@ -55,7 +67,10 @@ function AssistantBody({ answer }: { answer: AssistantAnswer }) {
   );
 }
 
-export default function ChatMessage({ entry }: { entry: ChatEntry }) {
+export default function ChatMessage({ entry, onShowEvidence }: {
+  entry: ChatEntry;
+  onShowEvidence: (citation: Citation) => void;
+}) {
   if (entry.role === "user") {
     return <div className="message user">{entry.text}</div>;
   }
@@ -68,7 +83,7 @@ export default function ChatMessage({ entry }: { entry: ChatEntry }) {
   }
   return (
     <div className="message bot">
-      <AssistantBody answer={entry.answer} />
+      <AssistantBody answer={entry.answer} onShowEvidence={onShowEvidence} />
     </div>
   );
 }

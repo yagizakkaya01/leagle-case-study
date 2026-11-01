@@ -4,7 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
+from fastapi import Path as PathParam
 
 from app.config import settings
 from app.dependencies import enforce_upload_limit, get_document_store
@@ -36,6 +37,22 @@ def upload_document(
     if not doc.chunks:
         raise HTTPException(422, "No extractable text was found in this PDF.")
     return to_document_info(doc)
+
+
+@router.get("/{document_id}/file")
+def download_document(
+    document_id: Annotated[str, PathParam(pattern="^[0-9a-f]{64}$")],
+    store: Annotated[DocumentStore, Depends(get_document_store)],
+) -> Response:
+    # The id is the file's sha256: only someone who already has the file or the id can ask.
+    data = store.load_file(document_id)
+    if data is None:
+        raise HTTPException(404, "The original file is no longer available.")
+    return Response(data, media_type="application/pdf", headers={
+        "Content-Disposition": "inline",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, max-age=3600",
+    })
 
 
 def to_document_info(doc: StoredDocument) -> DocumentInfo:

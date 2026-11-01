@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { askQuestionStream } from "../api/client";
 import type { StoredMessage } from "../types";
-import ChatMessage, { LiveMessage, type ChatEntry, type LiveAnswer } from "./ChatMessage";
+import ChatMessage, { LiveMessage, type ChatEntry, type Citation, type LiveAnswer } from "./ChatMessage";
+import EvidenceViewer from "./EvidenceViewer";
 
 const MAX_QUESTION_LENGTH = 1000;
 
@@ -49,6 +50,7 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [isWaiting, setIsWaiting] = useState(false);
   const [live, setLive] = useState<LiveAnswer | null>(null);
+  const [evidence, setEvidence] = useState<Citation | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(initialMessages.length);
   const abortRef = useRef<AbortController | null>(null);
@@ -137,7 +139,7 @@ export default function ChatPanel({
             </div>
           </div>
         ) : (
-          messages.map((entry) => <ChatMessage key={entry.id} entry={entry} />)
+          messages.map((entry) => <ChatMessage key={entry.id} entry={entry} onShowEvidence={setEvidence} />)
         )}
         {live && <LiveMessage live={live} />}
       </div>
@@ -159,6 +161,10 @@ export default function ChatPanel({
           Ask
         </button>
       </form>
+
+      {evidence && (
+        <EvidenceViewer documentId={documentId} citation={evidence} onClose={() => setEvidence(null)} />
+      )}
     </section>
   );
 }

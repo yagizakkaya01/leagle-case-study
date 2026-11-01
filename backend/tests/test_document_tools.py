@@ -18,6 +18,30 @@ def test_amendment_is_linked_to_the_clause_it_changes(tmp_path):
     assert all(c.metadata["page"] >= 7 for c in linked)
 
 
+def _search(doc, **args):
+    tools = make_tools(doc, Evidence())
+    return next(t for t in tools if t.name == "search_document").invoke(args)
+
+
+def test_clause_filter_with_no_match_searches_without_it(tmp_path):
+    doc = _licence(tmp_path)
+    tagged = {c.metadata["clause_category"] for c in doc.chunks}
+    absent = next(c for c in ("force_majeure", "non_compete", "assignment", "insurance")
+                  if c not in tagged)
+    note, results = _search(doc, query="annual licence fee", clause_category=absent).split("\n", 1)
+    assert absent in note and "128,000" in results
+
+
+def test_page_range_still_holds_when_the_clause_filter_is_dropped(tmp_path):
+    doc = _licence(tmp_path)
+    tagged = {c.metadata["clause_category"] for c in doc.chunks}
+    absent = next(c for c in ("force_majeure", "non_compete", "assignment", "insurance")
+                  if c not in tagged)
+    _, results = _search(doc, query="annual licence fee", clause_category=absent,
+                         page_from=7, page_to=7).split("\n", 1)
+    assert {r["page"] for r in json.loads(results) if not r.get("linked")} == {7}
+
+
 def test_search_returns_linked_passages_and_records_them_as_evidence(tmp_path):
     doc = _licence(tmp_path)
     evidence = Evidence()

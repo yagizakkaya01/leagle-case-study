@@ -28,6 +28,17 @@ def tokenize(text: str) -> list[str]:
     return re.sub(r"[^\w\s\-]", " ", to_ascii(text)).split()
 
 
+def _searchable(chunk: Document) -> Document:
+    """The chunk as search sees it: only a section's first chunk has the heading in its text.
+
+    Kept apart from page_content, which citations are checked against and shown from.
+    """
+    heading = chunk.metadata.get("section_heading")
+    if not heading or chunk.page_content.startswith(heading):
+        return chunk
+    return Document(f"{heading}\n{chunk.page_content}", metadata=chunk.metadata)
+
+
 def rrf_merge(*rankings: list[str], k: int = _RRF_K) -> list[str]:
     """Reciprocal Rank Fusion: score = sum of 1 / (k + rank) over the rankings."""
     scores: dict[str, float] = {}
@@ -43,7 +54,8 @@ class SearchIndex:
         self._reranker = reranker
         self._chunks = {c.metadata["chunk_id"]: c for c in chunks}
         self._order = list(self._chunks)
-        tokens = [tokenize(c.page_content) for c in chunks]
+        searchable = [_searchable(c) for c in chunks]
+        tokens = [tokenize(c.page_content) for c in searchable]
         # BM25Plus keeps term weights positive: BM25Okapi scores a term found in half
         # of a 2-chunk document as 0, so short PDFs returned no keyword hits at all.
         self._bm25 = BM25Plus(tokens) if chunks else None
@@ -52,7 +64,7 @@ class SearchIndex:
         if embeddings is not None and chunks:
             try:
                 self._vectors = InMemoryVectorStore(embeddings)
-                self._vectors.add_documents(chunks, ids=self._order)
+                self._vectors.add_documents(searchable, ids=self._order)
             except Exception:  # search still works on BM25 alone
                 log.warning("Embedding the chunks failed; using keyword search only",
                             exc_info=True)
@@ -86,7 +98,7 @@ class SearchIndex:
         if self._reranker is None or len(hits) < 2:
             return hits
         try:
-            ranked = self._reranker.compress_documents(hits, query)
+            ranked = self._reranker.compress_documents([_searchable(h) for h in hits], query)
         except Exception:  # the merged order is still a good one
             log.warning("Reranking failed; using the merged order", exc_info=True)
             return hits

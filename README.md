@@ -133,8 +133,10 @@ with `npm run lint` and `npm run build`.
    clause counts) are never overwritten by the model, and a failed call does not fail
    the upload.
 6. **Search index:** BM25 plus NVIDIA embeddings, merged with reciprocal rank fusion, then
-   reordered by an NVIDIA reranker. Keyword search alone works when no embedding model is
-   configured, and a failed rerank call keeps the merged order.
+   reordered by an NVIDIA reranker. Search also reads each chunk's section heading, without
+   changing the text citations are checked against. Keyword search alone works when no
+   embedding model is configured, and a failed or slow rerank call (10 s) keeps the merged
+   order.
 7. The PDF is stored under its sha256 (the same file uploaded twice is processed once).
 
 ### 2. Chat: tool calling with verified citations
@@ -352,7 +354,7 @@ The same code runs locally and as a public demo; only configuration differs.
 Over-engineering was explicitly discouraged, so these were skipped on purpose:
 
 - **Alembic migrations:** two small tables are created with SQLAlchemy `create_all`.
-- **Rerankers, MMR, OCR, multi-provider LLM fallback:** useful at scale, not for one PDF.
+- **MMR, OCR, multi-provider LLM fallback:** useful at scale, not for one PDF.
   A failed metadata call falls back to rule-based fields; a failed chat call is reported
   to the user, who can ask again.
 - **User accounts:** conversations are scoped to an anonymous browser id instead.
@@ -370,6 +372,8 @@ This project combines pieces I built and learned in earlier work:
 | Structured legal metadata, Turkish court case-number patterns, sha256-based de-duplication | indexing Turkish high-court decisions |
 
 ## Next steps for a legal product
+
+Search and chunking ideas are listed separately in [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
 
 Left out on purpose: the case asks for a simple document chatbot, and these change how
 the assistant behaves more than how the system is built. Each would come with its own

@@ -277,3 +277,15 @@ to the merged order.
 **The chat evaluation was not re-run with the reranker,** so this shows better ordering,
 not better answers. The answers in round 3 were already right on nearly every question.
 The documents are short and synthetic, so longer contracts may behave differently.
+
+**Section headings in search.** Search now also reads a chunk's section heading. Measured
+at production settings (five results, 15 candidates), this changed nothing: right page first
+29/40 without rerank and 33/40 with it, with or without headings. That says little either
+way, because these sections are short and most chunks already start with their heading. It
+is meant for long clauses split across chunks, which only a unit test covers.
+
+**Short chat check with these changes.** Nine hand-picked questions, one run each: six whose
+order the reranker changed, one that used several sources, one unanswerable and the prompt
+injection. All 9 passed, with no provider errors. `inject-01`, the failure in round 3, passed
+because its first source was the expected page this time. This catches an obvious breakage
+only; it is not a replacement for re-running the three sets, which is still open.

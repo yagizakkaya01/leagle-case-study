@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.config import settings
 
 RERANK_RESULTS = 20  # at least as many as search asks for; its default of 5 would cut results
+RERANK_TIMEOUT_SECONDS = 10.0
 
 
 def get_chat_model() -> BaseChatModel | None:
@@ -47,12 +48,16 @@ def get_embeddings() -> Embeddings | None:
 def get_reranker() -> BaseDocumentCompressor | None:
     if not settings.NVIDIA_API_KEY or not settings.NVIDIA_RERANK_MODEL:
         return None
-    return NVIDIARerank(
+    reranker = NVIDIARerank(
         model=settings.NVIDIA_RERANK_MODEL,
         api_key=settings.NVIDIA_API_KEY,
         top_n=RERANK_RESULTS,
         truncate="END",
     )
+    # NVIDIARerank has no timeout parameter; its client defaults to 60 s, too long to wait
+    # for a step that search can do without.
+    reranker._client.timeout = RERANK_TIMEOUT_SECONDS
+    return reranker
 
 
 def structured_output(llm: BaseChatModel, schema: type[BaseModel]) -> Runnable:

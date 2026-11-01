@@ -80,14 +80,22 @@ def make_tools(doc: StoredDocument, evidence: Evidence) -> list[BaseTool]:
         question. Fill `clause_category` or the page range ONLY if the user asked
         for that clause type or those pages; otherwise leave them empty.
         """
-        def where(d: Document) -> bool:
+        def in_pages(d: Document) -> bool:
             m = d.metadata
-            return ((clause_category is None or m["clause_category"] == clause_category)
-                    and (page_from is None or m["page"] >= page_from)
+            return ((page_from is None or m["page"] >= page_from)
                     and (page_to is None or m["page"] <= page_to))
 
+        def where(d: Document) -> bool:
+            return in_pages(d) and (clause_category is None
+                                    or d.metadata["clause_category"] == clause_category)
+
         hits = doc.index.search(query, k=MAX_RESULTS, where=where)
-        return evidence.add(hits, linked_chunks(doc.chunks, hits))
+        note = ""
+        if not hits and clause_category is not None:
+            # Categories come from keyword rules and can be wrong; pages are facts.
+            hits = doc.index.search(query, k=MAX_RESULTS, where=in_pages)
+            note = f"No chunks are tagged '{clause_category}'; these match without that filter.\n"
+        return note + evidence.add(hits, linked_chunks(doc.chunks, hits))
 
     @tool
     def find_clauses(category: ClauseCategory) -> str:

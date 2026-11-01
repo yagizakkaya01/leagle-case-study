@@ -219,7 +219,8 @@ partial JSON. **Measured limitation:** NVIDIA's hosted endpoint delivers tool-ca
 arguments in one piece (the other chunks are reasoning tokens), so with this provider the
 answer text arrives at once; the code streams it word by word with providers that stream
 tool arguments (covered by tests). Plain-text streaming was measured too and was about
-4× slower end to end, and it would give up the structured output. `final` always comes
+4× slower end to end (a one-off measurement; its script is not in this repository), and it
+would give up the structured output. `final` always comes
 last because verification needs the complete answer, so a streamed but unverified
 answer is replaced in the UI.
 

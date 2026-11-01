@@ -222,7 +222,9 @@ to the same endpoint hit the 60 s timeout during these runs, which points at the
 endpoint. That is not proof, so old and new code were then run side by side.
 
 **Speed comparison (same day, 18:19-19:03).** Eight basic-set questions, two passes, with
-three conditions taking turns on each question in rotating order:
+three conditions taking turns on each question in rotating order. This was a one-off
+measurement: the script that ran it is not in the repository, so it cannot be reproduced
+from here.
 
 | Condition | Answered | Passed | Full answer p50 | Mean | Max | Request per model call |
 |---|---|---|---|---|---|---|
@@ -262,7 +264,9 @@ the medians of those same pairs are 36.4 s and 27.6 s.
 
 Search now reorders its merged candidates with an NVIDIA reranker. This was measured on
 retrieval only: for 40 gold questions (those with an expected page, no earlier conversation
-turn, not naming a page), how high the right page came among the same ten candidates.
+turn, not naming a page), how high the right page came among the same ten candidates. This
+was a one-off measurement: the script that computed it is not in the repository (the
+runner has no retrieval metrics), so the table cannot be reproduced from here.
 
 | | Right page first | In the top 3 | MRR | Added time (median) |
 |---|---|---|---|---|

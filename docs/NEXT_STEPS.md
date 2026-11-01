@@ -41,3 +41,12 @@ legal questions, see "Next steps for a legal product" in the [README](../README.
   runner, which needs no chat model and so uses little of the rate limit.
 - **Longer, real documents.** The evaluation documents are short and synthetic. See the
   limits listed in EVAL.md.
+
+## Tried and left out
+
+- **A tool that reads the whole document, for risk lists.** Tried on a synthetic contract
+  with 11 risks. When the model called the tool, it found 10–11 of the 11 risks; with search
+  alone, 5–7 of 11. There were few runs, the model did not always call the tool (1 in 3 on an
+  ordinary question), and long answers hit the 60 s timeout. Left out of scope. This was a
+  one-off measurement with local code: neither the tool nor the script that measured it is
+  in the repository.

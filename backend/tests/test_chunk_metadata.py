@@ -15,6 +15,7 @@ from app.services.chunk_metadata import (
         ("Article 5. Termination", ("Article 5. Termination", "5")),
         ("Section 3.2 Payment Terms", ("Section 3.2 Payment Terms", "3.2")),
         ("4.1 Governing Law", ("4.1 Governing Law", "4.1")),
+        ("5. Payment", ("5. Payment", "5")),
         ("HÜKÜM", ("HÜKÜM", None)),
         ("TERMINATION", ("TERMINATION", None)),
     ],
@@ -30,6 +31,11 @@ def test_parse_heading_recognises_headings(line, expected):
         "The parties agree as follows, subject to the conditions below and in the annex",
         "2024",
         "",
+        # wrapped body lines that start with an amount, a year, a count or a party name
+        "30 percent of the fee on signing and the remaining",
+        "18.500 TL tutarındaki kira bedeli her ayın beşinci",
+        "2024 tarihinde imzalanan ek protokol ile değiştirilen",
+        "LICENSEE shall bear all costs",
     ],
 )
 def test_parse_heading_ignores_body_text(line):

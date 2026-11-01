@@ -33,8 +33,7 @@ def parse_heading(line: str, *, large_font: bool = False) -> tuple[str, str | No
     for pattern in _HEADING_PATTERNS:
         match = pattern.match(folded)
         if match:
-            # Numbered list items usually end with a full stop; headings do not.
-            if pattern is _HEADING_PATTERNS[1] and line.endswith((".", ";", ",")):
+            if pattern is _HEADING_PATTERNS[1] and _is_numbered_body_line(line, match):
                 return None
             return line, match.group("num")
 
@@ -47,8 +46,26 @@ def parse_heading(line: str, *, large_font: bool = False) -> tuple[str, str | No
     return None
 
 
-# Two or more all-caps words, or one of six letters or more, at the start of a line.
-_CAPS_LEAD = re.compile(r"^(?:[A-ZÇĞİÖŞÜ]{2,}\s+[A-ZÇĞİÖŞÜ]{2,}|[A-ZÇĞİÖŞÜ]{6,})\b")
+def _is_numbered_body_line(line: str, match: re.Match[str]) -> bool:
+    """A line starting with a number that reads as body text, not as a clause heading."""
+    # Numbered list items usually end with a full stop; headings do not.
+    if line.endswith((".", ";", ",")):
+        return True
+    # A wrapped line can start with an amount, a year or a count ("18.500 TL tutarındaki",
+    # "2024 tarihinde", "30 percent of the fee"). Clause numbers have at most two digits
+    # per part and are followed by a capitalised title. Digits and dots are the same in
+    # the folded text the match ran on, so its position also holds in `line`.
+    if any(len(part) >= 3 for part in match.group("num").split(".")):
+        return True
+    return line[match.end("num"):].lstrip(".) ")[:1].islower()
+
+
+# At the start of a line: two or more all-caps words ("SIDE LETTER dated ..."), or one of
+# six letters or more that is not followed by a lower-case word ("AMENDMENT No. 1" is a
+# heading, "LICENSEE shall bear all costs" is a sentence).
+_CAPS_LEAD = re.compile(
+    r"^(?:[A-ZÇĞİÖŞÜ]{2,}\s+[A-ZÇĞİÖŞÜ]{2,}\b|[A-ZÇĞİÖŞÜ]{6,}\b(?!\s+[a-zçğıöşü]))"
+)
 
 
 # --- Clause categories ----------------------------------------------------------

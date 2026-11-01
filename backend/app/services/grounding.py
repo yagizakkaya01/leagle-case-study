@@ -3,8 +3,9 @@
 The model chooses the answer; code decides what is shown as its source:
 - the cited chunk must be one a tool returned during this question,
 - the page number always comes from that chunk's metadata,
-- the quote must really appear in the chunk, otherwise the closest sentence
-  of the chunk is shown instead,
+- the quote must appear in the chunk word for word (at least three words; case,
+  spacing and punctuation aside), otherwise the closest sentence of the chunk is
+  shown instead,
 - a date or number the answer states must be in the quote when the chunk has it.
 
 An answer with several points cites each one; every citation passes the same checks.
@@ -22,7 +23,7 @@ from app.services.text_normalize import normalize_whitespace, to_ascii
 
 log = logging.getLogger(__name__)
 
-QUOTE_MATCH_THRESHOLD = 85  # rapidfuzz partial_ratio, 0-100
+MIN_QUOTE_WORDS = 3  # one or two words of a chunk say nothing about where an answer comes from
 MAX_SOURCES = 10
 MAX_QUOTE_CHARS = 600  # legal sentences are long; the highlight should cover the whole one
 UNVERIFIED_ANSWER = (
@@ -42,6 +43,17 @@ _LEGAL_REFERENCE = re.compile(
 
 def _norm(text: str) -> str:
     return normalize_whitespace(to_ascii(text))
+
+
+def _words(text: str) -> str:
+    """Lower-cased words without punctuation, so spacing and quote marks do not matter."""
+    return " ".join(re.findall(r"\w+", to_ascii(text)))
+
+
+def _in_chunk(quote: str, chunk_text: str) -> bool:
+    """The quote's words appear in the chunk in the same order, none changed or added."""
+    words = _words(quote)
+    return len(words.split()) >= MIN_QUOTE_WORDS and f" {words} " in f" {_words(chunk_text)} "
 
 
 def _sentences(text: str) -> list[str]:
@@ -78,9 +90,8 @@ def _trim(text: str) -> str:
 def _checked_quote(chunk: Document, quote: str | None, claim: str) -> str:
     chunk_id = chunk.metadata["chunk_id"]
     quote = quote or ""
-    match = fuzz.partial_ratio(_norm(quote), _norm(chunk.page_content)) if quote else 0
-    if match < QUOTE_MATCH_THRESHOLD:
-        log.info("quote replaced reason=not_in_chunk chunk=%s match=%d", chunk_id, match)
+    if not _in_chunk(quote, chunk.page_content):
+        log.info("quote replaced reason=not_in_chunk chunk=%s", chunk_id)
         quote = _closest_sentence(chunk.page_content, quote or claim)
 
     facts = _facts(claim)

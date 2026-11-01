@@ -242,6 +242,8 @@ All settings live in `backend/.env` (see [`.env.example`](backend/.env.example))
 | `NVIDIA_RERANK_MODEL` | `nvidia/llama-nemotron-rerank-vl-1b-v2` | reranker; empty = none |
 | `LLM_REASONING_EFFORT` | `low` | for reasoning models; empty for models without it |
 | `LLM_MAX_TOKENS` | `4096` | includes reasoning tokens |
+| `LLM_TIMEOUT_SECONDS` | `180` | per model call while answering a question (see below) |
+| `METADATA_TIMEOUT_SECONDS` | `60` | the optional metadata call that the upload waits for |
 | `DATABASE_URL` | empty | PostgreSQL URL for persistent history |
 | `AZURE_STORAGE_CONNECTION_STRING` | empty | Azure Blob (or Azurite) for PDF files |
 | `MAX_UPLOAD_MB` / `MAX_PAGES` | `10` / `50` | upload limits |
@@ -251,6 +253,12 @@ All settings live in `backend/.env` (see [`.env.example`](backend/.env.example))
 | `RETENTION_HOURS` | `0` | delete documents and their chats after N hours; `0` = keep |
 | `DEMO_NOTICE` | empty | banner text shown in the UI (public demo) |
 | `LOG_LEVEL` | `INFO` | backend log level |
+
+**Timeouts.** A model call that answers a question may take up to 180 s, and nginx waits up
+to 600 s between two stream events, so a slow answer is not cut off on the way. The metadata
+call keeps 60 s because the upload waits for it and works without it. About the evidence:
+60 s timeouts were seen with the pushed code as well, but the 180 s value was only measured
+with experimental code that is not in this repository.
 
 ## Logs
 

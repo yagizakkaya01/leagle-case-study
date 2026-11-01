@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from app.config import settings
-from app.llm import get_chat_model, get_embeddings, get_reranker
+from app.llm import get_chat_model, get_embeddings, get_metadata_model, get_reranker
 from app.services.chat import ChatService
 from app.services.document_metadata import build_extractor
 from app.services.document_store import DocumentStore
@@ -29,7 +29,7 @@ def get_document_store() -> DocumentStore:
         chunk_size=settings.CHUNK_SIZE,
         overlap=settings.CHUNK_OVERLAP,
         max_pages=settings.MAX_PAGES,
-        metadata_extractor=build_extractor(get_chat_model()),
+        metadata_extractor=build_extractor(get_metadata_model()),
         embeddings=get_embeddings(),
         reranker=get_reranker(),
         repository=get_repository(),

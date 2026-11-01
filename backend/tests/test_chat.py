@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from langchain_core.documents import Document
+from langchain_core.documents import BaseDocumentCompressor, Document
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.schemas import FinalAnswer
@@ -47,6 +47,43 @@ def test_keyword_search_finds_termination_and_respects_filter(doc):
 
 def test_search_index_without_chunks_returns_nothing():
     assert SearchIndex([]).search("anything") == []
+
+
+class _Reversing(BaseDocumentCompressor):
+    def compress_documents(self, documents, query, callbacks=None):
+        return [Document(d.page_content, metadata={**d.metadata, "relevance_score": 0.5})
+                for d in reversed(documents)]
+
+
+class _Failing(BaseDocumentCompressor):
+    def compress_documents(self, documents, query, callbacks=None):
+        raise RuntimeError("[410] Gone")
+
+
+def _notice_chunks():
+    return [Document(f"Notice rule number {n}.", metadata={"chunk_id": f"c{n}", "page": n})
+            for n in range(1, 4)]
+
+
+def _ids(hits):
+    return [h.metadata["chunk_id"] for h in hits]
+
+
+def test_reranker_decides_the_order_and_returns_the_original_chunks():
+    plain = _ids(SearchIndex(_notice_chunks()).search("notice"))
+    hits = SearchIndex(_notice_chunks(), reranker=_Reversing()).search("notice", k=2)
+    assert _ids(hits) == plain[::-1][:2]
+    assert "relevance_score" not in hits[0].metadata
+
+
+def test_failed_reranker_keeps_the_merged_order():
+    plain = _ids(SearchIndex(_notice_chunks()).search("notice"))
+    assert _ids(SearchIndex(_notice_chunks(), reranker=_Failing()).search("notice")) == plain
+
+
+def test_reranker_only_sees_chunks_the_filter_allows():
+    index = SearchIndex(_notice_chunks(), reranker=_Reversing())
+    assert _ids(index.search("notice", where=lambda d: d.metadata["page"] == 2)) == ["c2"]
 
 
 # --- grounding -----------------------------------------------------------------

@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     NVIDIA_API_KEY: str = ""
     NVIDIA_MODEL: str = "mistralai/mistral-large-4-1t-a52b"
     NVIDIA_EMBED_MODEL: str = "nvidia/nemotron-3-embed-1b"
+    NVIDIA_RERANK_MODEL: str = "nvidia/llama-nemotron-rerank-vl-1b-v2"  # empty = no reranking
     LLM_TEMPERATURE: float = 0.0
     LLM_MAX_TOKENS: int = 4096
     LLM_REASONING_EFFORT: str = "low"  # "low" | "medium" | "high"; empty = model default

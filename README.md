@@ -132,8 +132,9 @@ with `npm run lint` and `npm run build`.
    dates, governing law and a summary. Rule-based fields (outline, case numbers,
    clause counts) are never overwritten by the model, and a failed call does not fail
    the upload.
-6. **Search index:** BM25 plus NVIDIA embeddings, merged with reciprocal rank fusion.
-   Keyword search alone works when no embedding model is configured.
+6. **Search index:** BM25 plus NVIDIA embeddings, merged with reciprocal rank fusion, then
+   reordered by an NVIDIA reranker. Keyword search alone works when no embedding model is
+   configured, and a failed rerank call keeps the merged order.
 7. The PDF is stored under its sha256 (the same file uploaded twice is processed once).
 
 ### 2. Chat: tool calling with verified citations
@@ -237,6 +238,7 @@ All settings live in `backend/.env` (see [`.env.example`](backend/.env.example))
 | `NVIDIA_API_KEY` | — | free key from build.nvidia.com; without it chat is disabled |
 | `NVIDIA_MODEL` | `mistralai/mistral-large-4-1t-a52b` | chat model |
 | `NVIDIA_EMBED_MODEL` | `nvidia/nemotron-3-embed-1b` | embedding model |
+| `NVIDIA_RERANK_MODEL` | `nvidia/llama-nemotron-rerank-vl-1b-v2` | reranker; empty = none |
 | `LLM_REASONING_EFFORT` | `low` | for reasoning models; empty for models without it |
 | `LLM_MAX_TOKENS` | `4096` | includes reasoning tokens |
 | `DATABASE_URL` | empty | PostgreSQL URL for persistent history |
@@ -292,7 +294,7 @@ backend/
       pdf_processing.py     page extraction, sections, chunks
       chunk_metadata.py     headings, clause categories, references (rules)
       document_metadata.py  document-level metadata (one LLM call)
-      search_index.py       BM25 + embeddings + RRF
+      search_index.py       BM25 + embeddings + RRF + rerank
       document_tools.py     tools the model can call, evidence tracking
       chat.py               tool-calling loop + conversation memory
       grounding.py          citation verification

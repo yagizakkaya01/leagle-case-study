@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 
-from langchain_core.documents import Document
+from langchain_core.documents import BaseDocumentCompressor, Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.runnables import Runnable
 
@@ -54,6 +54,7 @@ class DocumentStore:
         max_pages: int,
         metadata_extractor: Runnable | None = None,
         embeddings: Embeddings | None = None,
+        reranker: BaseDocumentCompressor | None = None,
         repository: Repository | None = None,
     ):
         self._files = files
@@ -62,6 +63,7 @@ class DocumentStore:
         self._max_pages = max_pages
         self._extractor = metadata_extractor
         self._embeddings = embeddings
+        self._reranker = reranker
         self._repository = repository
         self._documents: dict[str, StoredDocument] = {}
         self._lock = threading.Lock()
@@ -148,5 +150,5 @@ class DocumentStore:
             chunks=processed.chunks,
             empty_pages=processed.empty_pages,
             metadata=metadata or DocumentMetadata(),
-            index=SearchIndex(processed.chunks, self._embeddings),
+            index=SearchIndex(processed.chunks, self._embeddings, self._reranker),
         )

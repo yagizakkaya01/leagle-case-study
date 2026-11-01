@@ -6,6 +6,7 @@
 |---|---|---|
 | Chat, tool calling, structured output | `mistralai/mistral-large-4-1t-a52b` with `reasoning_effort=low` | NVIDIA NIM free endpoint (build.nvidia.com) |
 | Embeddings (semantic search over chunks) | `nvidia/nemotron-3-embed-1b` | NVIDIA NIM free endpoint |
+| Reranking search results | `nvidia/llama-nemotron-rerank-vl-1b-v2` | NVIDIA NIM free endpoint |
 | First alternative for chat | `google/gemma-4-31b-it` | same endpoint, same key |
 
 Both are called through LangChain (`langchain-nvidia-ai-endpoints`). Switching models is

@@ -219,8 +219,33 @@ the rule after seeing the result would be grading our own paper, so it stays 29/
 
 Tool calls per answer did not rise (2.5 before; 2.2, 2.5 and 2.0 now), and metadata calls
 to the same endpoint hit the 60 s timeout during these runs, which points at the free
-endpoint. That is not proof: the longer prompt and the `sources` schema were not measured
-apart, since old and new code never ran side by side.
+endpoint. That is not proof, so old and new code were then run side by side.
+
+**Speed comparison (same day, 18:19-19:03).** Eight basic-set questions, two passes, with
+three conditions taking turns on each question in rotating order:
+
+| Condition | Answered | Passed | Full answer p50 | Mean | Max | Request per model call |
+|---|---|---|---|---|---|---|
+| Mistral, this code | 14/16 | 14 | 42.5 s | 41.1 s | 96.6 s | 7,910 bytes |
+| Mistral, `0f4d49a` | 14/16 | 14 | 33.0 s | 36.2 s | 62.7 s | 6,773 bytes |
+| Gemma 4 31B, this code | 0/16 | - | - | - | - | - |
+
+Each Mistral condition lost two attempts to connection errors, and no request hit a 429.
+Twelve question-and-pass pairs were answered by both Mistral conditions. The new code's
+median difference on them is +0.6 s and it was faster in 6 of 12, but its mean difference
+is +6.5 s (about 0 s without one 96.6 s answer that took 30.3 s on the second pass), and
+the medians of those same pairs are 36.4 s and 27.6 s.
+
+- **No clear code effect, but a small slowdown is not ruled out.** Twelve pairs with this
+  much spread cannot separate them, and requests did grow by about 17%.
+- **Most of the slowdown does not come from this change:** the old code also took about
+  30 s or more. The 13.9 s figure came from another question set and day, so this is not a
+  clean before-and-after.
+- **The endpoint was not shown to be the cause.** Nothing here measures it directly, and
+  time inside a model call was not captured: the probe stopped its clock when response
+  headers arrived, which says nothing about generation time.
+- **Gemma gave no speed figure.** All 16 attempts hit the 60 s timeout, as on 2026-10-31.
+  That only shows it cannot replace Mistral at this timeout, not how the endpoint behaves.
 
 **Limits of this round:**
 
@@ -232,3 +257,23 @@ apart, since old and new code never ran side by side.
   that was only tried by hand on a short synthetic contract.
 - Logging was added while the runs were in progress. It does not change answers, but the
   sets did not all start from the same files.
+
+## Reranking search results (2026-11-01)
+
+Search now reorders its merged candidates with an NVIDIA reranker. This was measured on
+retrieval only: for 40 gold questions (those with an expected page, no earlier conversation
+turn, not naming a page), how high the right page came among the same ten candidates.
+
+| | Right page first | In the top 3 | MRR | Added time (median) |
+|---|---|---|---|---|
+| Merged order | 29/40 | 38/40 | 0.838 | - |
+| `nvidia/llama-nemotron-rerank-vl-1b-v2` | 33/40 | 39/40 | 0.906 | 0.48 s |
+
+Five questions moved up to first place, including a Turkish one from ninth, and two moved
+down one place. Of the five rerank models the endpoint listed, this was the only one that
+answered: two returned 410 (end of life) and two 404, which is why a failed call falls back
+to the merged order.
+
+**The chat evaluation was not re-run with the reranker,** so this shows better ordering,
+not better answers. The answers in round 3 were already right on nearly every question.
+The documents are short and synthetic, so longer contracts may behave differently.

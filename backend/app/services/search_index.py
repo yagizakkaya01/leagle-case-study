@@ -1,7 +1,8 @@
 """Hybrid search over one document's chunks: BM25 + embeddings, merged with RRF.
 
 BM25 catches exact legal terms ("Madde 7", "force majeure"); embeddings catch
-paraphrases. Without an embedding model the index runs on BM25 alone.
+paraphrases. Without an embedding model the index runs on BM25 alone. A reranker, when
+configured, then reorders the merged candidates by reading each one with the query.
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ import logging
 import re
 from collections.abc import Callable
 
-from langchain_core.documents import Document
+from langchain_core.documents import BaseDocumentCompressor, Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import InMemoryVectorStore
 from rank_bm25 import BM25Plus
@@ -37,7 +38,9 @@ def rrf_merge(*rankings: list[str], k: int = _RRF_K) -> list[str]:
 
 
 class SearchIndex:
-    def __init__(self, chunks: list[Document], embeddings: Embeddings | None = None):
+    def __init__(self, chunks: list[Document], embeddings: Embeddings | None = None,
+                 reranker: BaseDocumentCompressor | None = None):
+        self._reranker = reranker
         self._chunks = {c.metadata["chunk_id"]: c for c in chunks}
         self._order = list(self._chunks)
         tokens = [tokenize(c.page_content) for c in chunks]
@@ -76,4 +79,15 @@ class SearchIndex:
             except Exception:
                 log.warning("Semantic search failed; using keyword results", exc_info=True)
 
-        return [self._chunks[cid] for cid in rrf_merge(semantic, keyword)[:k]]
+        merged = [self._chunks[cid] for cid in rrf_merge(semantic, keyword)[:candidates]]
+        return self._rerank(query, merged)[:k]
+
+    def _rerank(self, query: str, hits: list[Document]) -> list[Document]:
+        if self._reranker is None or len(hits) < 2:
+            return hits
+        try:
+            ranked = self._reranker.compress_documents(hits, query)
+        except Exception:  # the merged order is still a good one
+            log.warning("Reranking failed; using the merged order", exc_info=True)
+            return hits
+        return [self._chunks[d.metadata["chunk_id"]] for d in ranked]

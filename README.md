@@ -21,7 +21,7 @@ in the Azurite emulator on the server).
 | **Bonus:** persistent chat history (PostgreSQL via LangChain) | ✅ `PostgresChatMessageHistory`, reloadable from a sidebar |
 | **Bonus:** cloud document storage (Azure Blob) | ✅ Azure Blob SDK; Azurite emulator in Docker |
 | **Bonus:** cloud-backed conversations | ✅ each conversation is bound to its PDF; both reload on click |
-| **Bonus:** streaming responses | ✅ Server-Sent Events: tool steps live, then the verified answer ([details](#4-streaming)) |
+| **Bonus:** streaming responses | Partial: Server-Sent Events show each tool step live; with the default model the answer text arrives in one piece at the end ([details](#4-streaming)) |
 
 ---
 

@@ -160,7 +160,10 @@ It finishes by calling a `FinalAnswer` tool with `answer`, `chunk_id`, `page_num
 - `reference_text` must appear in the chunk word for word (at least three words; case,
   spacing and punctuation aside); otherwise the closest sentence of the chunk is shown;
 - a date or number the answer states must be in the quote when the chunk has it;
-- a claim with no supporting chunk is replaced by "could not find a passage…".
+- an answer the model marks as found but cites no chunk a tool returned is replaced by
+  "could not find a passage…". An answer marked as not found is shown as written, without
+  a citation. A chunk counts as the source because a tool returned it, not because its
+  text proves the answer (see Known limitations).
 
 An answer that makes several points from different passages, such as a list of risks,
 also fills `sources`, one entry per point. Each entry passes the same checks and gets its
@@ -404,6 +407,8 @@ eval questions, mainly to check that plain factual questions do not become over-
 
 ## Known limitations
 
+- The check confirms a quote is in the document, not that it supports the answer: an
+  answer can still contradict its quote.
 - Scanned PDFs without a text layer are not OCR'd; such pages (fewer than eight words of
   text) are reported as empty.
 - A line in capitals at the bottom of a page, such as a `STRICTLY CONFIDENTIAL` footer, is

@@ -80,9 +80,12 @@ ruff check .
 ```
 
 **Answer quality** is measured separately against the real model with a 30-question gold
-set (`python -m eval`): 29/30 passed in the latest run, with every answer correct, page
-numbers 24/25 correct, no citations for the 5 unanswerable questions and a prompt injection
-in the document ignored. A second, harder
+set (`python -m eval`). The latest full run, on commit `02abab5`, passed 29/30, with every
+answer correct, page numbers 24/25 correct, no citations for the 5 unanswerable questions
+and a prompt injection in the document ignored. That run came before the reranker and the
+later changes, including the cleanup after an independent review, so **it is not a result
+for the code delivered here**; after it, only a smoke test of nine hand-picked questions was
+run. The gold sets have not yet been run on this code. A second, harder
 set built on reported legal-RAG failure modes exposed two problems that are now fixed
 (superseded terms after amendments; tool calls lost in streamed turns). Method, results,
 speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md), including why

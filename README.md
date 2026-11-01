@@ -133,10 +133,8 @@ with `npm run lint` and `npm run build`.
    clause counts) are never overwritten by the model, and a failed call does not fail
    the upload.
 6. **Search index:** BM25 plus NVIDIA embeddings, merged with reciprocal rank fusion, then
-   reordered by an NVIDIA reranker. Search also reads each chunk's section heading, without
-   changing the text citations are checked against. Keyword search alone works when no
-   embedding model is configured, and a failed or slow rerank call (10 s) keeps the merged
-   order.
+   reordered by an NVIDIA reranker. Keyword search alone works when no embedding model is
+   configured, and a failed or slow rerank call (10 s) keeps the merged order.
 7. The PDF is stored under its sha256 (the same file uploaded twice is processed once).
 
 ### 2. Chat: tool calling with verified citations

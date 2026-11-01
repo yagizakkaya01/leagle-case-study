@@ -81,16 +81,6 @@ def test_failed_reranker_keeps_the_merged_order():
     assert _ids(SearchIndex(_notice_chunks(), reranker=_Failing()).search("notice")) == plain
 
 
-def test_section_heading_is_searchable_but_stays_out_of_the_chunk_text():
-    chunk = Document("The notice period is ninety days.",
-                     metadata={"chunk_id": "c1", "page": 1, "section_heading": "Termination"})
-    other = Document("The fee is due every month.",
-                     metadata={"chunk_id": "c2", "page": 1, "section_heading": "Payment"})
-    hits = SearchIndex([chunk, other]).search("termination")
-    assert _ids(hits) == ["c1"]
-    assert hits[0].page_content == "The notice period is ninety days."
-
-
 def test_reranker_only_sees_chunks_the_filter_allows():
     index = SearchIndex(_notice_chunks(), reranker=_Reversing())
     assert _ids(index.search("notice", where=lambda d: d.metadata["page"] == 2)) == ["c2"]

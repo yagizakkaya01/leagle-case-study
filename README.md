@@ -1,7 +1,8 @@
 # Legal Document Chat
 
 Upload a PDF, ask questions about it in a conversation, and get answers with the
-**page number** and a **verified quote** from the document.
+**page number** and a **quote** from the document. Code checks that the quote appears word
+for word in the passage it cites; it does not check that the quote supports the answer.
 
 FastAPI + LangChain backend, React frontend, PostgreSQL chat history and Azure Blob
 document storage (Azurite locally).
@@ -138,7 +139,7 @@ with `npm run lint` and `npm run build`.
    can add up to 60 s (the client's default timeout; the reranker class takes no timeout).
 7. The PDF is stored under its sha256 (the same file uploaded twice is processed once).
 
-### 2. Chat: tool calling with verified citations
+### 2. Chat: tool calling with checked citations
 
 The model does not get the whole document in its prompt. It **reads the document
 through typed tools**:

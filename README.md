@@ -408,8 +408,6 @@ eval questions, mainly to check that plain factual questions do not become over-
   to the clause and say the document cannot answer that, not recite a statute from memory.
 - **Show conflicts instead of choosing.** Two clauses that disagree, with no order of
   precedence, should both be shown.
-- **Cite more than one passage.** A question like "all termination grounds" spans pages,
-  while each answer shows one source today.
 
 ## Known limitations
 

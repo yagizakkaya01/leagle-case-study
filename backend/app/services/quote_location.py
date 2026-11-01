@@ -13,8 +13,9 @@ import pdfplumber
 from rapidfuzz import fuzz
 
 from app.schemas import HighlightBox
-from app.services.grounding import QUOTE_MATCH_THRESHOLD
 from app.services.pdf_processing import X_TOLERANCE
+
+MATCH_THRESHOLD = 85  # rapidfuzz partial_ratio, 0-100
 
 
 def _fold(text: str) -> str:
@@ -27,8 +28,9 @@ def _find(page_text: str, quote: str) -> tuple[int, int] | None:
     start = page_text.find(quote)
     if start != -1:
         return start, start + len(quote)
-    # The quote passed grounding with the same measure, so it may differ slightly.
-    match = fuzz.partial_ratio_alignment(quote, page_text, score_cutoff=QUOTE_MATCH_THRESHOLD)
+    # A quote holds the chunk's words, but the page's characters can still differ slightly
+    # (hyphenation, ligatures), so a close match is accepted here.
+    match = fuzz.partial_ratio_alignment(quote, page_text, score_cutoff=MATCH_THRESHOLD)
     return (match.dest_start, match.dest_end) if match else None
 
 

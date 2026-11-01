@@ -156,8 +156,8 @@ It finishes by calling a `FinalAnswer` tool with `answer`, `chunk_id`, `page_num
 
 - the cited chunk must be one a tool **actually returned during this question**;
 - `page_number` is **taken from that chunk's metadata**, never from the model;
-- `reference_text` must really appear in the chunk (`rapidfuzz` ≥ 85); otherwise the
-  closest sentence of the chunk is shown;
+- `reference_text` must appear in the chunk word for word (at least three words; case,
+  spacing and punctuation aside); otherwise the closest sentence of the chunk is shown;
 - a date or number the answer states must be in the quote when the chunk has it;
 - a claim with no supporting chunk is replaced by "could not find a passage…".
 
@@ -271,7 +271,7 @@ it causes, so `grep 3f9a1c7e` shows one question from start to end:
 
 ```
 INFO app.services.document_store [a81c04b9] document processed doc=90c9bf102b3f pages=17 chunks=45 empty_pages=0 bytes=184233 metadata_reused=False ms=2140
-INFO app.services.grounding      [3f9a1c7e] quote replaced reason=not_in_chunk chunk=90c9bf102b3f-p13-c1 match=62
+INFO app.services.grounding      [3f9a1c7e] quote replaced reason=not_in_chunk chunk=90c9bf102b3f-p13-c1
 INFO app.services.chat           [3f9a1c7e] answer doc=90c9bf102b3f conversation=57e1ac0d-… found=True sources=3 model_turns=3 tools=search_document,find_clauses model_ms=14210 tool_ms=380
 INFO app.logging_config          [3f9a1c7e] request method=POST path=/api/chat/stream status=200 ms=14650
 ```

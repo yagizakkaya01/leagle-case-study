@@ -86,8 +86,10 @@ and a prompt injection in the document ignored. That run came before the reranke
 later changes, including the cleanup after an independent review, so **it is not a result
 for the code delivered here**; after it, only a smoke test of nine hand-picked questions was
 run. The gold sets have not yet been run on this code. A second, harder
-set built on reported legal-RAG failure modes exposed two problems that are now fixed
-(superseded terms after amendments; tool calls lost in streamed turns). Method, results,
+set built on reported legal-RAG failure modes exposed two problems, which were addressed
+(superseded terms after amendments; tool calls lost in streamed turns). The held-out set
+did not tell the versions apart, so it is not shown that the first fix generalises beyond
+the question that exposed it. Method, results,
 speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md), including why
 the one failure stays counted and an unexplained slowdown in that run.
 

@@ -286,8 +286,20 @@ heading (it changed the search text of 2 of the 42 chunks). It was meant for lon
 split across chunks, which only a unit test covered. It was removed in the cleanup after an
 independent review, because nothing measured supported keeping it.
 
-**Short chat check with these changes.** Nine hand-picked questions, one run each: six whose
+**Smoke test with these changes.** Nine hand-picked questions, one run each: six whose
 order the reranker changed, one that used several sources, one unanswerable and the prompt
 injection. All 9 passed, with no provider errors. `inject-01`, the failure in round 3, passed
 because its first source was the expected page this time. This catches an obvious breakage
 only; it is not a replacement for re-running the three sets, which is still open.
+
+## After the cleanup (not yet measured)
+
+An independent review led to a cleanup: quotes are now accepted only word for word, the
+short tail of a clause that runs onto the next page is kept, wrapped lines that start with
+an amount or a year are no longer headings, section headings are no longer searched, and
+answers get 180 s per model call. On the evaluation documents the chunks, outline and
+clause numbers are unchanged, but the quote shown with an answer can differ.
+
+**None of the three sets has been run on this code yet.** Until they are, every number in
+this file describes earlier code, and the README's 29/30 is not a result for the delivered
+code.

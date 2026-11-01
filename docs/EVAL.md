@@ -36,10 +36,15 @@ three sets: **basic** (round 1 below), **hard** and **held-out** (round 2).
     returned `page_number` equals the labelled page;
   - not-in-document question passes when the system returns `found = false` (no citation);
   - any `must_not` string in the answer fails the question.
-- Provider errors are retried once and reported separately; they would not count as
-  wrong answers. Rates come with Wilson 95% confidence intervals.
+- In round 1, provider errors were retried once and reported separately; they would not
+  count as wrong answers. The runner now waits and retries up to six times
+  (`PROVIDER_RETRY_WAITS` in `backend/eval/__main__.py`). Rates come with Wilson 95%
+  confidence intervals.
 
 ## Results (2026-11-01, `mistralai/mistral-large-4-1t-a52b`, reasoning effort low)
+
+Runner output at the time; the current runner prints a different format (for example, it
+has no "hallucinated cites" line).
 
 ```
 questions: 30  scored: 30  provider errors: 0

@@ -427,6 +427,8 @@ eval questions, mainly to check that plain factual questions do not become over-
   (for example, one made only of symbols) opens its page without a highlight, with the
   quote shown above it.
 - Text drawn sideways on a page is not read in order, so it answers and highlights poorly.
-- The free NVIDIA endpoint has variable latency (answers usually take 5–20 s).
+- The free NVIDIA endpoint is slow and variable: in the measurements of 1 November 2026 the
+  median time to a full answer was 33–79 s, depending on the set (see
+  [docs/EVAL.md](docs/EVAL.md)).
 - Turkish is not explicitly listed for the embedding model; keyword search and the
   rule-based metadata cover Turkish documents.

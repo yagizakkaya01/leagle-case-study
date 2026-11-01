@@ -271,6 +271,12 @@ call keeps 60 s because the upload waits for it and works without it. About the 
 60 s timeouts were seen with the pushed code as well, but the 180 s value was only measured
 with experimental code that is not in this repository.
 
+**Docker and `.env`.** `docker-compose.yml` sets `DATABASE_URL`,
+`AZURE_STORAGE_CONNECTION_STRING` and `TRUSTED_PROXY_HOPS` (`1`, for the frontend's nginx)
+under `environment:`, and these override `backend/.env`. To change them, for example
+`TRUSTED_PROXY_HOPS: "2"` behind one more reverse proxy, put them in a
+`docker-compose.override.yml`; setting them in `backend/.env` has no effect in Docker.
+
 ## Logs
 
 ```bash

@@ -853,6 +853,7 @@ button:disabled {
 
 .pdf-page {
   position: relative;
+  overflow: hidden;
   background: #ffffff;
   box-shadow: var(--shadow-soft);
 }

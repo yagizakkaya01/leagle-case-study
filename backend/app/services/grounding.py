@@ -4,7 +4,8 @@ The model chooses the answer; code decides what is shown as its source:
 - the cited chunk must be one a tool returned during this question,
 - the page number always comes from that chunk's metadata,
 - the quote must really appear in the chunk, otherwise the closest sentence
-  of the chunk is shown instead.
+  of the chunk is shown instead,
+- a date or number the answer states must be in the quote when the chunk has it.
 """
 from __future__ import annotations
 
@@ -21,7 +22,9 @@ MAX_QUOTE_CHARS = 300
 UNVERIFIED_ANSWER = (
     "I could not find a passage in the document that supports an answer to this question."
 )
-_SENTENCE_SPLIT = re.compile(r"(?<=[.;:!?])\s+|\n+")
+# No colon: "Discharge date: 31.08.2024" must keep the value that follows its label.
+_SENTENCE_SPLIT = re.compile(r"(?<=[.;!?])\s+|\n+")
+_FACT = re.compile(r"\d[\d.,/-]*\d")  # two digits or more: skips list markers like "(1)"
 
 
 def _norm(text: str) -> str:
@@ -34,6 +37,18 @@ def _closest_sentence(chunk_text: str, target: str) -> str:
         return chunk_text[:MAX_QUOTE_CHARS]
     target_norm = _norm(target)
     return max(sentences, key=lambda s: fuzz.partial_ratio(_norm(s), target_norm))
+
+
+def _facts(text: str) -> set[str]:
+    """Dates and numbers, so that 31/08/2024 and 31.08.2024 compare as the same value."""
+    return {".".join(str(int(n)) for n in re.findall(r"\d+", m)) for m in _FACT.findall(text)}
+
+
+def _sentence_stating(chunk_text: str, facts: set[str], answer: str) -> str:
+    sentences = [s.strip() for s in _SENTENCE_SPLIT.split(chunk_text) if s.strip()]
+    answer_norm = _norm(answer)
+    return max(sentences, key=lambda s: (len(facts & _facts(s)),
+                                         fuzz.partial_ratio(_norm(s), answer_norm)))
 
 
 def _trim(text: str) -> str:
@@ -55,6 +70,10 @@ def verify(final: FinalAnswer, evidence: dict[str, Document]) -> FinalAnswer:
         QUOTE_MATCH_THRESHOLD
     ):
         quote = _closest_sentence(chunk.page_content, quote or final.answer)
+
+    facts = _facts(final.answer)
+    if len(facts & _facts(chunk.page_content)) > len(facts & _facts(quote)):
+        quote = _sentence_stating(chunk.page_content, facts, final.answer)
 
     return FinalAnswer(
         answer=final.answer,

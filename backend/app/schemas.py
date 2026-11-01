@@ -13,6 +13,19 @@ DocumentType = Literal[
 ]
 
 
+class HighlightRequest(BaseModel):
+    page: int = Field(ge=1)
+    quote: str = Field(min_length=1, max_length=1000)
+
+
+class HighlightBox(BaseModel):
+    """A rectangle on a page, in percent of the page size."""
+    x: float
+    top: float
+    width: float
+    height: float
+
+
 class Party(BaseModel):
     name: str
     role: str | None = Field(None, description="e.g. Tenant, Landlord, Plaintiff, Defendant")

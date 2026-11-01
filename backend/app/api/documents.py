@@ -9,9 +9,10 @@ from fastapi import Path as PathParam
 
 from app.config import settings
 from app.dependencies import enforce_upload_limit, get_document_store
-from app.schemas import DocumentInfo
+from app.schemas import DocumentInfo, HighlightBox, HighlightRequest
 from app.services.document_store import DocumentStore, StoredDocument
 from app.services.pdf_processing import PdfProcessingError
+from app.services.quote_location import locate_quote
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -53,6 +54,18 @@ def download_document(
         "X-Content-Type-Options": "nosniff",
         "Cache-Control": "private, max-age=3600",
     })
+
+
+@router.post("/{document_id}/highlights", response_model=list[HighlightBox])
+def find_highlights(
+    document_id: Annotated[str, PathParam(pattern="^[0-9a-f]{64}$")],
+    body: HighlightRequest,
+    store: Annotated[DocumentStore, Depends(get_document_store)],
+) -> list[HighlightBox]:
+    data = store.load_file(document_id)
+    if data is None:
+        raise HTTPException(404, "The original file is no longer available.")
+    return locate_quote(data, body.page, body.quote)
 
 
 def to_document_info(doc: StoredDocument) -> DocumentInfo:

@@ -1,4 +1,11 @@
-import type { ChatAnswer, ConversationDetail, ConversationSummary, DocumentInfo, PublicSettings } from "../types";
+import type {
+  ChatAnswer,
+  ConversationDetail,
+  ConversationSummary,
+  DocumentInfo,
+  HighlightBox,
+  PublicSettings,
+} from "../types";
 import { getClientId } from "./clientId";
 
 const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -43,6 +50,16 @@ export async function uploadDocument(file: File): Promise<DocumentInfo> {
 
 export function documentFileUrl(documentId: string): string {
   return `${API_URL}/api/documents/${encodeURIComponent(documentId)}/file`;
+}
+
+// Where a cited quote sits on its page; boxes are in percent of the page size
+export async function findHighlights(documentId: string, page: number, quote: string): Promise<HighlightBox[]> {
+  const response = await request(`/api/documents/${encodeURIComponent(documentId)}/highlights`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page, quote }),
+  });
+  return (await response.json()) as HighlightBox[];
 }
 
 export interface StreamHandlers {

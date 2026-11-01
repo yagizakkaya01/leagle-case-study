@@ -200,3 +200,38 @@ def test_streamed_turn_sends_its_tool_calls_back_to_the_provider(doc):
     sent = convert_message_to_dict(turn)
     assert sent["tool_calls"][0]["function"]["name"] == "search_document"
     assert json.loads(sent["tool_calls"][0]["function"]["arguments"]) == {"query": "aylık ücret"}
+
+
+def test_replacement_quote_keeps_the_value_after_a_label():
+    chunk = Document(
+        page_content="12345678901 Discharge Date : 31.08.2024\nAdmission Date : 26.08.2024",
+        metadata={"chunk_id": "c1", "page": 1},
+    )
+    final = FinalAnswer(answer="31.08.2024", chunk_id="c1", reference_text="left on 31.08.2024")
+    checked = verify(final, {"c1": chunk})
+    assert checked.reference_text == "12345678901 Discharge Date : 31.08.2024"
+
+
+FORM = Document(
+    page_content="Discharge Date : 31.08.2024\nExit Type : Recovered and discharged",
+    metadata={"chunk_id": "c1", "page": 1},
+)
+
+
+def test_quote_moves_to_the_line_stating_the_answers_date():
+    final = FinalAnswer(answer="Discharged on 31/08/2024.", chunk_id="c1",
+                        reference_text="Exit Type : Recovered and discharged")
+    assert verify(final, {"c1": FORM}).reference_text == "Discharge Date : 31.08.2024"
+
+
+def test_quote_stays_when_it_already_states_the_date():
+    final = FinalAnswer(answer="31.08.2024", chunk_id="c1",
+                        reference_text="Discharge Date : 31.08.2024")
+    assert verify(final, {"c1": FORM}).reference_text == "Discharge Date : 31.08.2024"
+
+
+def test_quote_stays_when_the_chunk_lacks_the_number():
+    # A value the model worked out is not in the text; there is no better line to show.
+    final = FinalAnswer(answer="In total 128 days.", chunk_id="c1",
+                        reference_text="Exit Type : Recovered and discharged")
+    assert verify(final, {"c1": FORM}).reference_text == "Exit Type : Recovered and discharged"

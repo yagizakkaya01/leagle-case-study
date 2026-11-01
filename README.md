@@ -204,6 +204,7 @@ answer is replaced in the UI.
 |---|---|---|
 | `POST` | `/api/documents` | upload a PDF (multipart `file`) → document info + metadata |
 | `GET` | `/api/documents/{id}/file` | the original PDF, for the evidence viewer |
+| `POST` | `/api/documents/{id}/highlights` | `{page, quote}` → where the quote sits on the page, in percent of the page |
 | `POST` | `/api/chat` | `{document_id, session_id, client_id, question}` → `{answer, page_number, reference_text, found, tool_calls, elapsed_seconds}` |
 | `POST` | `/api/chat/stream` | same body; Server-Sent Events (`tool`, `delta`, `final`, `error`) |
 | `GET` | `/api/conversations?client_id=` | saved conversations, newest first |
@@ -325,8 +326,10 @@ This project combines pieces I built and learned in earlier work:
 ## Known limitations
 
 - Scanned PDFs without a text layer are not OCR'd; such pages are reported as empty.
-- The evidence viewer finds the quote by text. If it cannot, the page opens without a
-  highlight and the quote is shown above it. It also has no search or text selection.
+- The evidence viewer has no search or text selection. A quote that cannot be located
+  (for example, one made only of symbols) opens its page without a highlight, with the
+  quote shown above it.
+- Text drawn sideways on a page is not read in order, so it answers and highlights poorly.
 - The free NVIDIA endpoint has variable latency (answers usually take 5–20 s).
 - Turkish is not explicitly listed for the embedding model; keyword search and the
   rule-based metadata cover Turkish documents.

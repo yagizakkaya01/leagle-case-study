@@ -44,6 +44,9 @@ from tests.pdf_factory import make_pdf
 
 RESULTS_DIR = Path(__file__).parent / "results"
 SETS = {"basic": GOLD, "hard": GOLD_HARD, "heldout": GOLD_HELDOUT}
+# Seconds before each attempt. The free endpoint's limit clears within minutes; retrying at
+# once would spend a whole set on 429s. Latency is timed per attempt, so waits don't count.
+PROVIDER_RETRY_WAITS = (0, 60, 120, 240, 300, 300)
 
 
 def wilson(c: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -106,7 +109,8 @@ def run_one(chat: ChatService, docs: dict[str, StoredDocument], gold: dict, run:
     doc = docs[gold["doc"]]
     base = {"id": gold["id"], "run": run, "category": gold["category"],
             "failure_mode": gold.get("failure_mode")}
-    for attempt in (1, 2):  # one retry for provider errors; they don't count as wrong
+    for attempt, wait in enumerate(PROVIDER_RETRY_WAITS, start=1):  # they don't count as wrong
+        time.sleep(wait)
         conversation = str(uuid.uuid4())
         try:
             for earlier in gold["history"]:
@@ -131,7 +135,7 @@ def run_one(chat: ChatService, docs: dict[str, StoredDocument], gold: dict, run:
                         "outcome": "error", "answer_ok": False,
                         "page_ok": False if gold["found"] else None, "forbidden": [],
                         "tool_ok": False if gold.get("tool") else None}
-            if attempt == 2:
+            if attempt == len(PROVIDER_RETRY_WAITS):
                 return {**base, "infra_error": str(exc)}
     return {
         **base, "question": gold["question"], "expected_pages": gold["pages"],

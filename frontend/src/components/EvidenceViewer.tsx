@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { documentFileUrl } from "../api/client";
+import { documentFileUrl, findHighlights } from "../api/client";
+import type { HighlightBox } from "../types";
 import type { Citation } from "./ChatMessage";
-import { locateQuote, type Box, type TextRun } from "./locateQuote";
 
 const MAX_RENDER_SCALE = 3;
 const ZOOM_FACTOR = 2; // the page is rendered for this width, so zooming in stays sharp
@@ -16,7 +16,7 @@ async function loadPdfjs() {
 }
 
 interface PageView {
-  boxes: Box[]; // in percent of the page, so they follow the canvas size
+  boxes: HighlightBox[]; // in percent of the page, so they follow the canvas size
 }
 
 interface EvidenceViewerProps {
@@ -70,7 +70,6 @@ export default function EvidenceViewer({ documentId, citation, onClose }: Eviden
     setView(null);
     void (async () => {
       try {
-        const pdfjs = await loadPdfjs();
         const page = await pdf.getPage(pageNumber);
         if (cancelled) return;
         const base = page.getViewport({ scale: 1 });
@@ -83,23 +82,11 @@ export default function EvidenceViewer({ documentId, citation, onClose }: Eviden
         cancelRender = () => render.cancel();
         await render.promise;
 
-        let boxes: Box[] = [];
-        if (citation.quote && pageNumber === citation.page) {
-          const content = await page.getTextContent();
-          const runs: TextRun[] = [];
-          for (const item of content.items) {
-            if (!("str" in item) || !item.str) continue;
-            const m = pdfjs.Util.transform(base.transform, item.transform);
-            const height = Math.hypot(m[2], m[3]);
-            runs.push({ str: item.str, x: m[4], top: m[5] - height, width: item.width, height: height * 1.25 });
-          }
-          boxes = locateQuote(runs, citation.quote).map((b) => ({
-            x: (b.x / base.width) * 100,
-            top: (b.top / base.height) * 100,
-            width: (b.width / base.width) * 100,
-            height: (b.height / base.height) * 100,
-          }));
-        }
+        // Without boxes the page and the quote text above it still serve as the evidence
+        const boxes =
+          citation.quote && pageNumber === citation.page
+            ? await findHighlights(documentId, pageNumber, citation.quote).catch(() => [])
+            : [];
         if (!cancelled) setView({ boxes });
       } catch {
         if (!cancelled) setError("This page could not be displayed.");
@@ -109,7 +96,7 @@ export default function EvidenceViewer({ documentId, citation, onClose }: Eviden
       cancelled = true;
       cancelRender?.();
     };
-  }, [pdf, pageNumber, citation]);
+  }, [pdf, documentId, pageNumber, citation]);
 
   useEffect(() => {
     firstBoxRef.current?.scrollIntoView({ block: "center", inline: "start" });

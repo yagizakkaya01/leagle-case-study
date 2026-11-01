@@ -22,6 +22,7 @@ from app.services.chunk_metadata import (
     referenced_clauses,
 )
 
+X_TOLERANCE = 1.5  # tighter than the default, which glues words together in many LaTeX PDFs
 _MIN_REAL_WORDS = 8
 _HEADING_FONT_RATIO = 1.15  # line font >= 115% of the body font -> heading
 
@@ -99,8 +100,7 @@ def _extract_lines(pdf: pdfplumber.PDF) -> tuple[list[str], frozenset[tuple[int,
     page_lines: list[list[tuple[str, float]]] = []
     sizes: list[float] = []
     for page in pdf.pages:
-        # Tighter x_tolerance: the default glues words together in many LaTeX PDFs.
-        lines = page.extract_text_lines(x_tolerance=1.5)
+        lines = page.extract_text_lines(x_tolerance=X_TOLERANCE)
         page_lines.append([(ln["text"], statistics.mean(c["size"] for c in ln["chars"]))
                            for ln in lines if ln["chars"]])
         sizes.extend(c["size"] for ln in lines for c in ln["chars"])

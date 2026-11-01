@@ -90,3 +90,10 @@ export interface ConversationDetail {
   document: DocumentInfo;
   messages: StoredMessage[];
 }
+
+export interface HighlightBox {
+  x: number;
+  top: number;
+  width: number;
+  height: number;
+}

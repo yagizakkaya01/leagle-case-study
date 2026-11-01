@@ -40,7 +40,40 @@ def make_pdf(pages: list[str]) -> bytes:
         ops.append("ET")
         stream = "\n".join(ops).encode("latin-1")
         objects.append(b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream")
+    return _assemble(objects)
 
+
+def make_positioned_pdf(cells: list[tuple[int, int, str]], rotate: int = 0,
+                        crop: tuple[int, int, int, int] | None = None) -> bytes:
+    """One 612x792 page drawing (x, y, text) cells in the given order.
+
+    x and y are where the text appears, from the bottom left of the page as displayed;
+    a rotated page draws its text so that it reads upright, as real documents do.
+    """
+    place = {
+        0: lambda x, y: ("1 0 0 1", x, y),
+        90: lambda x, y: ("0 1 -1 0", 612 - y, x),
+        180: lambda x, y: ("-1 0 0 -1", 612 - x, 792 - y),
+        270: lambda x, y: ("0 -1 1 0", y, 792 - x),
+    }[rotate]
+    ops = ["BT", "/F1 11 Tf"]
+    for x, y, text in cells:
+        matrix, tx, ty = place(x, y)
+        ops.append(f"{matrix} {tx} {ty} Tm ({text}) Tj")
+    ops.append("ET")
+    stream = "\n".join(ops).encode("latin-1")
+    box = f"/CropBox [{' '.join(map(str, crop))}] " if crop else ""
+    return _assemble([
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [4 0 R] /Count 1 >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] {box}/Rotate {rotate} "
+        f"/Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>".encode(),
+        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+    ])
+
+
+def _assemble(objects: list[bytes]) -> bytes:
     out = bytearray(b"%PDF-1.4\n")
     offsets = []
     for number, body in enumerate(objects, start=1):

@@ -423,6 +423,8 @@ eval questions, mainly to check that plain factual questions do not become over-
 
 - The check confirms a quote is in the document, not that it supports the answer: an
   answer can still contradict its quote.
+- Lists such as all risks in a contract can be incomplete; the system does not guarantee
+  a complete list.
 - Scanned PDFs without a text layer are not OCR'd; such pages (fewer than eight words of
   text) are reported as empty.
 - A line in capitals at the bottom of a page, such as a `STRICTLY CONFIDENTIAL` footer, is

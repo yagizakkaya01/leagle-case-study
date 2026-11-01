@@ -16,10 +16,19 @@ from pydantic import BaseModel
 from app.config import settings
 
 RERANK_RESULTS = 20  # at least as many as search asks for; its default of 5 would cut results
-RERANK_TIMEOUT_SECONDS = 10.0
 
 
 def get_chat_model() -> BaseChatModel | None:
+    """The model that answers questions; long answers on the free endpoint can pass 60 s."""
+    return _chat_model(settings.LLM_TIMEOUT_SECONDS)
+
+
+def get_metadata_model() -> BaseChatModel | None:
+    """The same model for the optional metadata call, which the upload waits for."""
+    return _chat_model(settings.METADATA_TIMEOUT_SECONDS)
+
+
+def _chat_model(timeout: float) -> BaseChatModel | None:
     if not settings.NVIDIA_API_KEY:
         return None
     effort = settings.LLM_REASONING_EFFORT
@@ -29,7 +38,7 @@ def get_chat_model() -> BaseChatModel | None:
         temperature=settings.LLM_TEMPERATURE,
         # Reasoning tokens count against this limit; too low a value cuts the answer off.
         max_completion_tokens=settings.LLM_MAX_TOKENS,
-        timeout=settings.LLM_TIMEOUT_SECONDS,
+        timeout=timeout,
         usage_telemetry_enabled=False,
         model_kwargs={"reasoning_effort": effort} if effort else {},
     )
@@ -48,16 +57,13 @@ def get_embeddings() -> Embeddings | None:
 def get_reranker() -> BaseDocumentCompressor | None:
     if not settings.NVIDIA_API_KEY or not settings.NVIDIA_RERANK_MODEL:
         return None
-    reranker = NVIDIARerank(
+    # NVIDIARerank takes no timeout, so a hung call waits for its client's 60 s default.
+    return NVIDIARerank(
         model=settings.NVIDIA_RERANK_MODEL,
         api_key=settings.NVIDIA_API_KEY,
         top_n=RERANK_RESULTS,
         truncate="END",
     )
-    # NVIDIARerank has no timeout parameter; its client defaults to 60 s, too long to wait
-    # for a step that search can do without.
-    reranker._client.timeout = RERANK_TIMEOUT_SECONDS
-    return reranker
 
 
 def structured_output(llm: BaseChatModel, schema: type[BaseModel]) -> Runnable:

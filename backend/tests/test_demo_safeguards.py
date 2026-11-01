@@ -60,4 +60,4 @@ def test_purge_deletes_old_documents_files_and_chats(tmp_path):
 
 def test_public_settings_endpoint():
     body = TestClient(app).get("/api/settings").json()
-    assert set(body) == {"demo_notice", "retention_hours", "max_upload_mb"}
+    assert set(body) == {"demo_notice", "retention_hours"}

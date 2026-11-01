@@ -36,10 +36,15 @@ three sets: **basic** (round 1 below), **hard** and **held-out** (round 2).
     returned `page_number` equals the labelled page;
   - not-in-document question passes when the system returns `found = false` (no citation);
   - any `must_not` string in the answer fails the question.
-- Provider errors are retried once and reported separately; they would not count as
-  wrong answers. Rates come with Wilson 95% confidence intervals.
+- In round 1, provider errors were retried once and reported separately; they would not
+  count as wrong answers. The runner now waits and retries up to six times
+  (`PROVIDER_RETRY_WAITS` in `backend/eval/__main__.py`). Rates come with Wilson 95%
+  confidence intervals.
 
 ## Results (2026-11-01, `mistralai/mistral-large-4-1t-a52b`, reasoning effort low)
+
+Runner output at the time; the current runner prints a different format (for example, it
+has no "hallucinated cites" line).
 
 ```
 questions: 30  scored: 30  provider errors: 0
@@ -222,7 +227,9 @@ to the same endpoint hit the 60 s timeout during these runs, which points at the
 endpoint. That is not proof, so old and new code were then run side by side.
 
 **Speed comparison (same day, 18:19-19:03).** Eight basic-set questions, two passes, with
-three conditions taking turns on each question in rotating order:
+three conditions taking turns on each question in rotating order. This was a one-off
+measurement: the script that ran it is not in the repository, so it cannot be reproduced
+from here.
 
 | Condition | Answered | Passed | Full answer p50 | Mean | Max | Request per model call |
 |---|---|---|---|---|---|---|
@@ -262,7 +269,9 @@ the medians of those same pairs are 36.4 s and 27.6 s.
 
 Search now reorders its merged candidates with an NVIDIA reranker. This was measured on
 retrieval only: for 40 gold questions (those with an expected page, no earlier conversation
-turn, not naming a page), how high the right page came among the same ten candidates.
+turn, not naming a page), how high the right page came among the same ten candidates. This
+was a one-off measurement: the script that computed it is not in the repository (the
+runner has no retrieval metrics), so the table cannot be reproduced from here.
 
 | | Right page first | In the top 3 | MRR | Added time (median) |
 |---|---|---|---|---|
@@ -278,14 +287,34 @@ to the merged order.
 not better answers. The answers in round 3 were already right on nearly every question.
 The documents are short and synthetic, so longer contracts may behave differently.
 
-**Section headings in search.** Search now also reads a chunk's section heading. Measured
-at production settings (five results, 15 candidates), this changed nothing: right page first
-29/40 without rerank and 33/40 with it, with or without headings. That says little either
-way, because these sections are short and most chunks already start with their heading. It
-is meant for long clauses split across chunks, which only a unit test covers.
+**Section headings in search (removed).** Search was changed to also read a chunk's section
+heading. Measured at production settings (five results, 15 candidates), this changed nothing:
+right page first 29/40 without rerank and 33/40 with it, with or without headings. That says
+little either way, because these sections are short and most chunks already start with their
+heading (it changed the search text of 2 of the 42 chunks). It was meant for long clauses
+split across chunks, which only a unit test covered. It was removed in the cleanup after an
+independent review, because nothing measured supported keeping it.
 
-**Short chat check with these changes.** Nine hand-picked questions, one run each: six whose
+**Smoke test with these changes.** Nine hand-picked questions, one run each: six whose
 order the reranker changed, one that used several sources, one unanswerable and the prompt
 injection. All 9 passed, with no provider errors. `inject-01`, the failure in round 3, passed
 because its first source was the expected page this time. This catches an obvious breakage
 only; it is not a replacement for re-running the three sets, which is still open.
+
+## After the cleanup
+
+An independent review led to a cleanup: quotes are now accepted only word for word, the
+short tail of a clause that runs onto the next page is kept, wrapped lines that start with
+an amount or a year are no longer headings, section headings are no longer searched, and
+answers get 180 s per model call. On the evaluation documents the chunks, outline and
+clause numbers are unchanged, but the quote shown with an answer can differ.
+
+**Basic set on this code (2026-11-01):** 29/30 passed, one run per question, no provider
+errors. Every answer was correct (25/25), pages 24/25, and all 5 unanswerable questions were
+refused. The one failure is `inject-01` again: the answer was right and ignored the injected
+instruction, but its first source was page 1 and the runner expects page 2. It stays counted.
+Full answers took p50 31.0 s, p95 97.5 s, max 135.5 s.
+
+**The hard and held-out sets were not re-run on this code,** so their numbers above describe
+earlier code. These documents do not exercise the page-break and heading fixes, which only
+unit tests cover.

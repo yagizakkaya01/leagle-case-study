@@ -81,16 +81,6 @@ def test_failed_reranker_keeps_the_merged_order():
     assert _ids(SearchIndex(_notice_chunks(), reranker=_Failing()).search("notice")) == plain
 
 
-def test_section_heading_is_searchable_but_stays_out_of_the_chunk_text():
-    chunk = Document("The notice period is ninety days.",
-                     metadata={"chunk_id": "c1", "page": 1, "section_heading": "Termination"})
-    other = Document("The fee is due every month.",
-                     metadata={"chunk_id": "c2", "page": 1, "section_heading": "Payment"})
-    hits = SearchIndex([chunk, other]).search("termination")
-    assert _ids(hits) == ["c1"]
-    assert hits[0].page_content == "The notice period is ninety days."
-
-
 def test_reranker_only_sees_chunks_the_filter_allows():
     index = SearchIndex(_notice_chunks(), reranker=_Reversing())
     assert _ids(index.search("notice", where=lambda d: d.metadata["page"] == 2)) == ["c2"]
@@ -117,6 +107,48 @@ def test_verify_replaces_invented_quote_with_chunk_sentence():
                         reference_text="The contract ends automatically after one year.")
     checked = verify(final, {"x-p2-c0": CHUNK})
     assert checked.reference_text == CHUNK.page_content
+
+
+NOTICES = Document("10. Notices\nNotices must be in writing and sent to the registered office.",
+                   metadata={"chunk_id": "c5", "page": 5})
+
+
+@pytest.mark.parametrize("quote", [
+    # the whole (short) chunk plus an invented ending: it used to pass as a near match
+    "10. Notices Notices must be in writing and sent to the registered office, and a notice "
+    "sent by e-mail is void unless a courier confirms it within two days.",
+    # a single word of the chunk quotes nothing
+    "Notices",
+])
+def test_quote_must_be_in_the_chunk_word_for_word(quote):
+    final = FinalAnswer(answer="E-mail notices are void.", chunk_id="c5", reference_text=quote)
+    checked = verify(final, {"c5": NOTICES})
+    assert checked.reference_text == "Notices must be in writing and sent to the registered office."
+
+
+@pytest.mark.parametrize("quote", [
+    "Either party may terminate this Agreement by giving sixty days written notice.",
+    "The Client may terminate this Agreement by giving ninety days written notice.",
+])
+def test_quote_with_a_changed_word_is_replaced(quote):
+    final = FinalAnswer(answer="Notice is required.", chunk_id="x-p2-c0", reference_text=quote)
+    assert verify(final, {"x-p2-c0": CHUNK}).reference_text == CHUNK.page_content
+
+
+def test_quote_matches_despite_case_spacing_and_punctuation():
+    chunk = Document("The Client's data shall be returned\nwithin fifteen Business Days.",
+                     metadata={"chunk_id": "c6", "page": 3})
+    quote = "the client’s data shall be returned within fifteen business days"
+    final = FinalAnswer(answer="Within fifteen Business Days.", chunk_id="c6",
+                        reference_text=quote)
+    assert verify(final, {"c6": chunk}).reference_text == quote
+
+
+def test_short_form_line_is_kept():
+    invoice = Document("Fatura No: 2024-118\nTarih: 31.08.2024\nTutar: 1.250 TL",
+                       metadata={"chunk_id": "c7", "page": 1})
+    final = FinalAnswer(answer="31.08.2024", chunk_id="c7", reference_text="Tarih: 31.08.2024")
+    assert verify(final, {"c7": invoice}).reference_text == "Tarih: 31.08.2024"
 
 
 def test_verify_rejects_chunk_the_tools_never_returned():

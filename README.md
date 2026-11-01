@@ -1,7 +1,8 @@
 # Legal Document Chat
 
 Upload a PDF, ask questions about it in a conversation, and get answers with the
-**page number** and a **verified quote** from the document.
+**page number** and a **quote** from the document. Code checks that the quote appears word
+for word in the passage it cites; it does not check that the quote supports the answer.
 
 FastAPI + LangChain backend, React frontend, PostgreSQL chat history and Azure Blob
 document storage (Azurite locally).
@@ -18,9 +19,9 @@ in the Azurite emulator on the server).
 | Answer + page number + reference text | ✅ structured output, checked against the document by code |
 | React chat UI showing answer, page and reference | ✅ the page and a one-line quote sit under each answer; "Show evidence" opens the original PDF page with the quote highlighted |
 | **Bonus:** persistent chat history (PostgreSQL via LangChain) | ✅ `PostgresChatMessageHistory`, reloadable from a sidebar |
-| **Bonus:** cloud document storage (Azure Blob) | ✅ Azure Blob SDK; Azurite emulator in Docker |
+| **Bonus:** cloud document storage (Azure Blob) | Azure Blob SDK, tested on Azurite (the emulator); not tried with a real Azure account |
 | **Bonus:** cloud-backed conversations | ✅ each conversation is bound to its PDF; both reload on click |
-| **Bonus:** streaming responses | ✅ Server-Sent Events: tool steps live, then the verified answer ([details](#4-streaming)) |
+| **Bonus:** streaming responses | Partial: Server-Sent Events show each tool step live; with the default model the answer text arrives in one piece at the end ([details](#4-streaming)) |
 
 ---
 
@@ -79,17 +80,22 @@ ruff check .
 ```
 
 **Answer quality** is measured separately against the real model with a 30-question gold
-set (`python -m eval`): 29/30 passed in the latest run, with every answer correct, page
-numbers 24/25 correct, no citations for the 5 unanswerable questions and a prompt injection
-in the document ignored. A second, harder
-set built on reported legal-RAG failure modes exposed two problems that are now fixed
-(superseded terms after amendments; tool calls lost in streamed turns). Method, results,
+set (`python -m eval`). The latest run, on the code delivered here, passed 29/30, with every
+answer correct, page numbers 24/25 correct, no citations for the 5 unanswerable questions
+and a prompt injection in the document ignored. The one failure is a two-part question whose
+answer was right but cited the other part's page first. The harder and held-out sets were
+not re-run on this code. A second, harder
+set built on reported legal-RAG failure modes exposed two problems, which were addressed
+(superseded terms after amendments; tool calls lost in streamed turns). The held-out set
+did not tell the versions apart, so it is not shown that the first fix generalises beyond
+the question that exposed it. Method, results,
 speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md), including why
 the one failure stays counted and an unexplained slowdown in that run.
 
 Chat tests run against a scripted fake chat model. Setting `TEST_DATABASE_URL` and
 `TEST_AZURE_CONNECTION_STRING` (values in `.github/workflows/ci.yml`) also runs the
-PostgreSQL and Azure Blob variants; CI does this on every push. The frontend is checked
+PostgreSQL and Azure Blob variants; CI does this on pushes to main and on pull requests.
+The frontend is checked
 with `npm run lint` and `npm run build`.
 
 ---
@@ -133,13 +139,12 @@ with `npm run lint` and `npm run build`.
    clause counts) are never overwritten by the model, and a failed call does not fail
    the upload.
 6. **Search index:** BM25 plus NVIDIA embeddings, merged with reciprocal rank fusion, then
-   reordered by an NVIDIA reranker. Search also reads each chunk's section heading, without
-   changing the text citations are checked against. Keyword search alone works when no
-   embedding model is configured, and a failed or slow rerank call (10 s) keeps the merged
-   order.
+   reordered by an NVIDIA reranker. Keyword search alone works when no embedding model is
+   configured, and a failed rerank call keeps the merged order. A rerank call that hangs
+   can add up to 60 s (the client's default timeout; the reranker class takes no timeout).
 7. The PDF is stored under its sha256 (the same file uploaded twice is processed once).
 
-### 2. Chat: tool calling with verified citations
+### 2. Chat: tool calling with checked citations
 
 The model does not get the whole document in its prompt. It **reads the document
 through typed tools**:
@@ -157,10 +162,13 @@ It finishes by calling a `FinalAnswer` tool with `answer`, `chunk_id`, `page_num
 
 - the cited chunk must be one a tool **actually returned during this question**;
 - `page_number` is **taken from that chunk's metadata**, never from the model;
-- `reference_text` must really appear in the chunk (`rapidfuzz` ≥ 85); otherwise the
-  closest sentence of the chunk is shown;
+- `reference_text` must appear in the chunk word for word (at least three words; case,
+  spacing and punctuation aside); otherwise the closest sentence of the chunk is shown;
 - a date or number the answer states must be in the quote when the chunk has it;
-- a claim with no supporting chunk is replaced by "could not find a passage…".
+- an answer the model marks as found but cites no chunk a tool returned is replaced by
+  "could not find a passage…". An answer marked as not found is shown as written, without
+  a citation. A chunk counts as the source because a tool returned it, not because its
+  text proves the answer (see Known limitations).
 
 An answer that makes several points from different passages, such as a list of risks,
 also fills `sources`, one entry per point. Each entry passes the same checks and gets its
@@ -210,7 +218,8 @@ partial JSON. **Measured limitation:** NVIDIA's hosted endpoint delivers tool-ca
 arguments in one piece (the other chunks are reasoning tokens), so with this provider the
 answer text arrives at once; the code streams it word by word with providers that stream
 tool arguments (covered by tests). Plain-text streaming was measured too and was about
-4× slower end to end, and it would give up the structured output. `final` always comes
+4× slower end to end (a one-off measurement; its script is not in this repository), and it
+would give up the structured output. `final` always comes
 last because verification needs the complete answer, so a streamed but unverified
 answer is replaced in the UI.
 
@@ -226,7 +235,7 @@ answer is replaced in the UI.
 | `GET` | `/api/conversations?client_id=` | saved conversations, newest first |
 | `GET` | `/api/conversations/{id}?client_id=` | document + stored messages with citations |
 | `DELETE` | `/api/conversations/{id}?client_id=` | delete a conversation and its history |
-| `GET` | `/api/settings` | demo banner text, retention, upload limit for the UI |
+| `GET` | `/api/settings` | demo banner text and retention for the UI |
 | `GET` | `/healthz` | liveness |
 
 Interactive docs: `/docs`.
@@ -243,15 +252,29 @@ All settings live in `backend/.env` (see [`.env.example`](backend/.env.example))
 | `NVIDIA_RERANK_MODEL` | `nvidia/llama-nemotron-rerank-vl-1b-v2` | reranker; empty = none |
 | `LLM_REASONING_EFFORT` | `low` | for reasoning models; empty for models without it |
 | `LLM_MAX_TOKENS` | `4096` | includes reasoning tokens |
+| `LLM_TIMEOUT_SECONDS` | `180` | per model call while answering a question (see below) |
+| `METADATA_TIMEOUT_SECONDS` | `60` | the optional metadata call that the upload waits for |
 | `DATABASE_URL` | empty | PostgreSQL URL for persistent history |
 | `AZURE_STORAGE_CONNECTION_STRING` | empty | Azure Blob (or Azurite) for PDF files |
-| `MAX_UPLOAD_MB` / `MAX_PAGES` | `10` / `50` | upload limits |
+| `MAX_UPLOAD_MB` / `MAX_PAGES` | `10` / `50` | upload limits in the backend; the UI (10 MB) and nginx (11 MB) have their own fixed limits |
 | `CORS_ORIGINS` | `http://localhost:5173` | allowed frontend origins in development |
 | `CHAT_LIMIT_PER_HOUR` / `UPLOAD_LIMIT_PER_HOUR` | `60` / `20` | per client IP; `0` = unlimited |
 | `TRUSTED_PROXY_HOPS` | `0` (`1` in Docker) | reverse proxies in front, used to read the real client IP |
 | `RETENTION_HOURS` | `0` | delete documents and their chats after N hours; `0` = keep |
 | `DEMO_NOTICE` | empty | banner text shown in the UI (public demo) |
 | `LOG_LEVEL` | `INFO` | backend log level |
+
+**Timeouts.** A model call that answers a question may take up to 180 s, and nginx waits up
+to 600 s between two stream events, so a slow answer is not cut off on the way. The metadata
+call keeps 60 s because the upload waits for it and works without it. About the evidence:
+60 s timeouts were seen with the pushed code as well, but the 180 s value was only measured
+with experimental code that is not in this repository.
+
+**Docker and `.env`.** `docker-compose.yml` sets `DATABASE_URL`,
+`AZURE_STORAGE_CONNECTION_STRING` and `TRUSTED_PROXY_HOPS` (`1`, for the frontend's nginx)
+under `environment:`, and these override `backend/.env`. To change them, for example
+`TRUSTED_PROXY_HOPS: "2"` behind one more reverse proxy, put them in a
+`docker-compose.override.yml`; setting them in `backend/.env` has no effect in Docker.
 
 ## Logs
 
@@ -264,14 +287,14 @@ it causes, so `grep 3f9a1c7e` shows one question from start to end:
 
 ```
 INFO app.services.document_store [a81c04b9] document processed doc=90c9bf102b3f pages=17 chunks=45 empty_pages=0 bytes=184233 metadata_reused=False ms=2140
-INFO app.services.grounding      [3f9a1c7e] quote replaced reason=not_in_chunk chunk=90c9bf102b3f-p13-c1 match=62
+INFO app.services.grounding      [3f9a1c7e] quote replaced reason=not_in_chunk chunk=90c9bf102b3f-p13-c1
 INFO app.services.chat           [3f9a1c7e] answer doc=90c9bf102b3f conversation=57e1ac0d-… found=True sources=3 model_turns=3 tools=search_document,find_clauses model_ms=14210 tool_ms=380
 INFO app.logging_config          [3f9a1c7e] request method=POST path=/api/chat/stream status=200 ms=14650
 ```
 
 | Looking for | Search for |
 |---|---|
-| Model errors (with traceback) and rate limits | `model call failed`, `model rate limited` |
+| Failed answers (with traceback; model, database or code) and model rate limits | `answer failed`, `model rate limited` |
 | Requests the API refused, with the reason | `rejected status=` |
 | Citations code had to correct or remove | `quote replaced`, `source dropped`, `answer rejected` |
 | A quote that could not be drawn on the page | `highlight found nothing` |
@@ -280,6 +303,10 @@ INFO app.logging_config          [3f9a1c7e] request method=POST path=/api/chat/s
 Documents can be confidential, so these lines hold counts and short ids: never the question,
 the answer, a quote, a filename or a full document id. A traceback can still repeat error
 text returned by the model provider.
+
+This covers the backend's log. The frontend's nginx writes no access log for `/api/`, but
+its error log can still contain a request line, with the full document id, when the backend
+fails or times out.
 
 ## Project structure
 
@@ -321,7 +348,8 @@ docker-compose.yml          frontend, backend, PostgreSQL, Azurite
 
 - **Why tool calling for a single PDF?** Putting retrieved text into the prompt and
   asking for a page number lets the model invent pages and quotes. With tools, every
-  citation is traceable to a chunk the code returned, and the code verifies it.
+  citation is traceable to a chunk the code returned, and the code checks it. This is a
+  design argument; it was not compared against a simpler design.
 - **Rules where rules are enough.** Headings, clause categories and case numbers
   are deterministic and free; the LLM is used once per upload for fields rules cannot
   read (parties, summary).
@@ -349,14 +377,19 @@ The same code runs locally and as a public demo; only configuration differs.
   documents, their files in Blob storage and all conversations about them.
 - **Banner:** `DEMO_NOTICE` asks visitors not to upload confidential documents.
 
-### Deliberately left out
+### Scope
 
-Over-engineering was explicitly discouraged, so these were skipped on purpose:
+The case discourages over-engineering, and parts of this project go beyond what it asks:
+hybrid search with a reranker and cross-reference linking, the tool-calling loop and the
+evidence viewer that highlights the quote on the PDF page. They were kept because rewriting
+or removing them close to the deadline risked new bugs, not because a comparison showed
+they were needed; no comparison against a simpler design was run.
+
+Left out:
 
 - **Alembic migrations:** two small tables are created with SQLAlchemy `create_all`.
-- **MMR, OCR, multi-provider LLM fallback:** useful at scale, not for one PDF.
-  A failed metadata call falls back to rule-based fields; a failed chat call is reported
-  to the user, who can ask again.
+- **MMR, OCR, multi-provider LLM fallback:** not added. A failed metadata call falls back
+  to rule-based fields; a failed chat call is reported to the user, who can ask again.
 - **User accounts:** conversations are scoped to an anonymous browser id instead.
 - **Content-level duplicate detection:** duplicates are detected by file hash only, so
   a re-saved copy of the same document counts as a new upload.
@@ -391,16 +424,29 @@ eval questions, mainly to check that plain factual questions do not become over-
   to the clause and say the document cannot answer that, not recite a statute from memory.
 - **Show conflicts instead of choosing.** Two clauses that disagree, with no order of
   precedence, should both be shown.
-- **Cite more than one passage.** A question like "all termination grounds" spans pages,
-  while each answer shows one source today.
 
 ## Known limitations
 
-- Scanned PDFs without a text layer are not OCR'd; such pages are reported as empty.
+- The check confirms a quote is in the document, not that it supports the answer: an
+  answer can still contradict its quote.
+- Lists such as all risks in a contract can be incomplete; the system does not guarantee
+  a complete list.
+- Scanned PDFs without a text layer are not OCR'd; such pages (fewer than eight words of
+  text) are reported as empty.
+- A line in capitals at the bottom of a page, such as a `STRICTLY CONFIDENTIAL` footer, is
+  taken as a heading. It then replaces the clause heading that carries over to the next
+  page, so the text at the top of that page loses its clause heading and number.
+- A wrapped line that starts with a date, such as "15 January 2024 between the parties", is
+  still taken as a numbered heading (clause 15).
+- Chat history in PostgreSQL uses one long-lived database connection that is not opened
+  again: if the database restarts, chat fails until the backend is restarted. This was
+  found by reading the code, not reproduced.
 - The evidence viewer has no search or text selection. A quote that cannot be located
   (for example, one made only of symbols) opens its page without a highlight, with the
   quote shown above it.
 - Text drawn sideways on a page is not read in order, so it answers and highlights poorly.
-- The free NVIDIA endpoint has variable latency (answers usually take 5–20 s).
+- The free NVIDIA endpoint is slow and variable: in the measurements of 1 November 2026 the
+  median time to a full answer was 33–79 s, depending on the set (see
+  [docs/EVAL.md](docs/EVAL.md)).
 - Turkish is not explicitly listed for the embedding model; keyword search and the
   rule-based metadata cover Turkish documents.

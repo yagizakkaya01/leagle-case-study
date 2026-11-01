@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE: float = 0.0
     LLM_MAX_TOKENS: int = 4096
     LLM_REASONING_EFFORT: str = "low"  # "low" | "medium" | "high"; empty = model default
-    LLM_TIMEOUT_SECONDS: float = 60.0
+    LLM_TIMEOUT_SECONDS: float = 180.0      # per model call while answering a question
+    METADATA_TIMEOUT_SECONDS: float = 60.0  # the optional metadata call the upload waits for
 
     # --- Public demo safeguards ---
     CHAT_LIMIT_PER_HOUR: int = 60      # per client IP; 0 = unlimited

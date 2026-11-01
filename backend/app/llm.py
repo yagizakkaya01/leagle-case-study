@@ -19,6 +19,16 @@ RERANK_RESULTS = 20  # at least as many as search asks for; its default of 5 wou
 
 
 def get_chat_model() -> BaseChatModel | None:
+    """The model that answers questions; long answers on the free endpoint can pass 60 s."""
+    return _chat_model(settings.LLM_TIMEOUT_SECONDS)
+
+
+def get_metadata_model() -> BaseChatModel | None:
+    """The same model for the optional metadata call, which the upload waits for."""
+    return _chat_model(settings.METADATA_TIMEOUT_SECONDS)
+
+
+def _chat_model(timeout: float) -> BaseChatModel | None:
     if not settings.NVIDIA_API_KEY:
         return None
     effort = settings.LLM_REASONING_EFFORT
@@ -28,7 +38,7 @@ def get_chat_model() -> BaseChatModel | None:
         temperature=settings.LLM_TEMPERATURE,
         # Reasoning tokens count against this limit; too low a value cuts the answer off.
         max_completion_tokens=settings.LLM_MAX_TOKENS,
-        timeout=settings.LLM_TIMEOUT_SECONDS,
+        timeout=timeout,
         usage_telemetry_enabled=False,
         model_kwargs={"reasoning_effort": effort} if effort else {},
     )

@@ -29,7 +29,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.config import settings
-from app.llm import get_chat_model, get_embeddings, get_reranker
+from app.llm import get_chat_model, get_embeddings, get_metadata_model, get_reranker
 from app.services.chat import ChatService
 from app.services.document_metadata import build_extractor
 from app.services.document_store import DocumentStore, StoredDocument
@@ -234,7 +234,8 @@ def main() -> None:
     repo = MemoryRepository()
     store = DocumentStore(LocalFileStorage(Path(tempfile.mkdtemp())),
                           chunk_size=settings.CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP,
-                          max_pages=settings.MAX_PAGES, metadata_extractor=build_extractor(llm),
+                          max_pages=settings.MAX_PAGES,
+                          metadata_extractor=build_extractor(get_metadata_model()),
                           embeddings=get_embeddings(), reranker=get_reranker(), repository=repo)
     gold = [g for g in SETS[args.gold_set]
             if not args.only or g["id"] in args.only.split(",")]

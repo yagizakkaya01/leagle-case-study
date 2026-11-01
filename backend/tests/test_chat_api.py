@@ -112,3 +112,23 @@ def test_stream_endpoint_reports_llm_failure_as_error_event(setup):
 def test_stream_endpoint_validates_before_streaming(setup):
     client, _, _ = setup
     assert client.post("/api/chat/stream", json=_body("missing")).status_code == 404
+
+
+class _RateLimitedChat:
+    def ask(self, *_):
+        raise RuntimeError("[429] Too Many Requests")
+
+    def ask_stream(self, *_):
+        raise RuntimeError("[429] Too Many Requests")
+        yield
+
+
+def test_rate_limit_is_explained_instead_of_a_generic_failure(setup):
+    client, doc, _ = setup
+    app.dependency_overrides[get_chat_service] = _RateLimitedChat
+
+    res = client.post("/api/chat", json=_body(doc.document_id))
+    assert res.status_code == 503 and "rate limited" in res.json()["detail"]
+
+    stream = client.post("/api/chat/stream", json=_body(doc.document_id))
+    assert "event: error" in stream.text and "rate limited" in stream.text

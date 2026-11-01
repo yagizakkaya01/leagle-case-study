@@ -74,7 +74,7 @@ docker compose up -d db azurite
 
 ```bash
 cd backend
-pytest -q          # 102 tests; 6 need PostgreSQL/Azurite and are skipped without them
+pytest -q          # 6 tests need PostgreSQL/Azurite and are skipped without them
 ruff check .
 ```
 
@@ -83,7 +83,9 @@ set (`python -m eval`): 30/30 passed, page numbers 25/25 correct, no citations f
 unanswerable questions, a prompt injection in the document ignored. A second, harder
 set built on reported legal-RAG failure modes exposed two problems that are now fixed
 (superseded terms after amendments; tool calls lost in streamed turns). Method, results,
-speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md).
+speed and the limits of these numbers are in [docs/EVAL.md](docs/EVAL.md). The latest full
+re-run did not finish because of the free endpoint's rate limit; that file says what was
+and was not measured.
 
 Chat tests run against a scripted fake chat model. Setting `TEST_DATABASE_URL` and
 `TEST_AZURE_CONNECTION_STRING` (values in `.github/workflows/ci.yml`) also runs the
@@ -124,8 +126,8 @@ with `npm run lint` and `npm run build`.
    over a page break.
 4. **Chunks** (word-based window inside each section) get rule-based metadata:
    `chunk_id`, page, section heading, clause number, clause category (payment,
-   termination, governing law, … via Turkish + English keyword rules), amount/date
-   flags and defined terms.
+   termination, governing law, … via Turkish + English keyword rules) and the clauses
+   it refers to.
 5. **Document metadata:** one structured LLM call extracts type, title, parties, key
    dates, governing law and a summary. Rule-based fields (outline, case numbers,
    clause counts) are never overwritten by the model, and a failed call does not fail
@@ -154,10 +156,16 @@ It finishes by calling a `FinalAnswer` tool with `answer`, `chunk_id`, `page_num
 - `page_number` is **taken from that chunk's metadata**, never from the model;
 - `reference_text` must really appear in the chunk (`rapidfuzz` ≥ 85); otherwise the
   closest sentence of the chunk is shown;
+- a date or number the answer states must be in the quote when the chunk has it;
 - a claim with no supporting chunk is replaced by "could not find a passage…".
 
 The model chooses and phrases the answer; code decides what counts as its source. The
 UI also lists the tool calls behind each answer ("How this answer was found").
+
+"Show evidence" opens the original PDF on the cited page with the quote highlighted. The
+same library that extracted the text locates the quote and returns boxes from its
+character positions, so forms, columns, rotated and cropped pages stay aligned; pdf.js
+only draws the page.
 
 ### 3. Memory and persistence
 
@@ -248,22 +256,24 @@ backend/
     api/                    documents, chat, conversations endpoints
     services/
       pdf_processing.py     page extraction, sections, chunks
-      chunk_metadata.py     headings, clause categories, flags (rules)
+      chunk_metadata.py     headings, clause categories, references (rules)
       document_metadata.py  document-level metadata (one LLM call)
       search_index.py       BM25 + embeddings + RRF
       document_tools.py     tools the model can call, evidence tracking
       chat.py               tool-calling loop + conversation memory
       grounding.py          citation verification
+      quote_location.py     where a quote sits on its page, for the highlight
       document_store.py     upload / reload of documents
       persistence.py        in-memory or PostgreSQL repository
       file_storage.py       local folder or Azure Blob
+      rate_limit.py         per-visitor limits for the public demo
   tests/                    pytest suite (fake LLM, in-memory PDFs)
   eval/                     gold set + runner for the real-model evaluation
 frontend/
   src/
     api/                    REST client, anonymous client id
     components/             UploadPanel, DocumentCard, ChatPanel, ChatMessage,
-                            ConversationSidebar
+                            EvidenceViewer, ConversationSidebar, DemoBanner
 docs/MODEL_SELECTION.md     why these models, with live measurements
 docs/EVAL.md                answer-quality evaluation against the real model
 docker-compose.yml          frontend, backend, PostgreSQL, Azurite
@@ -274,7 +284,7 @@ docker-compose.yml          frontend, backend, PostgreSQL, Azurite
 - **Why tool calling for a single PDF?** Putting retrieved text into the prompt and
   asking for a page number lets the model invent pages and quotes. With tools, every
   citation is traceable to a chunk the code returned, and the code verifies it.
-- **Rules where rules are enough.** Headings, clause categories, case numbers and flags
+- **Rules where rules are enough.** Headings, clause categories and case numbers
   are deterministic and free; the LLM is used once per upload for fields rules cannot
   read (parties, summary).
 - **Structured output as a forced tool call.** `ChatNVIDIA.with_structured_output`
@@ -307,8 +317,8 @@ Over-engineering was explicitly discouraged, so these were skipped on purpose:
 
 - **Alembic migrations:** two small tables are created with SQLAlchemy `create_all`.
 - **Rerankers, MMR, OCR, multi-provider LLM fallback:** useful at scale, not for one PDF.
-  Transient LLM errors are retried; a failed metadata call falls back to rule-based
-  fields.
+  A failed metadata call falls back to rule-based fields; a failed chat call is reported
+  to the user, who can ask again.
 - **User accounts:** conversations are scoped to an anonymous browser id instead.
 - **Content-level duplicate detection:** duplicates are detected by file hash only, so
   a re-saved copy of the same document counts as a new upload.
@@ -322,6 +332,27 @@ This project combines pieces I built and learned in earlier work:
 | Page-aware chunking, chunk quality filter, BM25 + vector search with RRF, chat UI layout | a RAG assistant for company documents |
 | Typed tools instead of free text, "the data is the truth, the narration is convenience", showing tool calls next to the answer, config/logging/compose/CI layout, model evaluation method | a natural-language query system over a PostgreSQL event store |
 | Structured legal metadata, Turkish court case-number patterns, sha256-based de-duplication | indexing Turkish high-court decisions |
+
+## Next steps for a legal product
+
+Left out on purpose: the case asks for a simple document chatbot, and these change how
+the assistant behaves more than how the system is built. Each would come with its own
+eval questions, mainly to check that plain factual questions do not become over-cautious.
+
+- **Ask which party the user is.** "Can I terminate?" depends on the side. Answer for each
+  party named in the document, then ask once and let conversation memory keep the reply.
+- **Correct a false premise.** "Where does the 60-day notice come from?" should first say
+  that the document says 30, not explain the wrong number.
+- **Say when pages could not be read.** "Not in the document" can be wrong if a scanned
+  annex was skipped; the answer should name the unread pages.
+- **Know today's date.** "Is this contract still in force?" needs it to compare with the
+  end date.
+- **Stay inside the document on questions of law.** "Is this clause lawful?" should point
+  to the clause and say the document cannot answer that, not recite a statute from memory.
+- **Show conflicts instead of choosing.** Two clauses that disagree, with no order of
+  precedence, should both be shown.
+- **Cite more than one passage.** A question like "all termination grounds" spans pages,
+  while each answer shows one source today.
 
 ## Known limitations
 

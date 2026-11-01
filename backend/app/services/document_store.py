@@ -76,8 +76,10 @@ class DocumentStore:
         record = self._repository.get_document(document_id) if self._repository else None
         known = DocumentMetadata.model_validate(record.metadata) if record else None
         doc = self._build(data, document_id, filename, known)
+        if not doc.chunks:  # the API rejects it; keeping it would escape the retention purge
+            return doc
         self._files.save(document_id, data)
-        if self._repository is not None and doc.chunks:
+        if self._repository is not None:
             self._repository.save_document(DocumentRecord(
                 document_id, filename,
                 {**doc.metadata.model_dump(), "page_count": doc.page_count},

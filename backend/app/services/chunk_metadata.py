@@ -1,4 +1,4 @@
-"""Rule-based metadata for chunks: section headings, clause categories, flags.
+"""Rule-based metadata for chunks: section headings, clause categories, references.
 
 No LLM is involved, so every value here is deterministic and cheap; the tool
 layer filters on these fields instead of trusting the model to find them.
@@ -93,36 +93,6 @@ def classify_clause(heading: str | None, text: str) -> str:
             best, best_score = category, score
     # A single keyword in body text is too weak a signal on its own.
     return best if best_score >= 2 else OTHER
-
-
-# --- Flags and terms --------------------------------------------------------------
-_AMOUNT = re.compile(
-    r"(?:[$€£₺]\s?\d)|(?:\d[\d.,]*\s?(?:tl|try|usd|eur|euro|euros|gbp|dollars?|lira|"
-    r"pounds?)\b)|(?:\b(?:euros?|dollars?|lira)\b)",
-    re.IGNORECASE,
-)
-_MONTHS = (
-    "january|february|march|april|may|june|july|august|september|october|november|december|"
-    "ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik"
-)
-_DATE = re.compile(
-    rf"\b\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{2,4}}\b|\b\d{{4}}-\d{{2}}-\d{{2}}\b|"
-    rf"\b\d{{1,2}}\s+(?:{_MONTHS})\s+\d{{4}}\b|\b(?:{_MONTHS})\s+\d{{1,2}},?\s+\d{{4}}\b"
-)
-# "Tenant", “Kiracı” - quoted terms starting with a capital letter.
-_DEFINED_TERM = re.compile(r"[\"“]([A-ZÇĞİÖŞÜ][\wçğıöşüÇĞİÖŞÜ\- ]{1,40}?)[\"”]")
-
-
-def has_amount(text: str) -> bool:
-    return bool(_AMOUNT.search(text))
-
-
-def has_date(text: str) -> bool:
-    return bool(_DATE.search(to_ascii(text)))
-
-
-def defined_terms(text: str) -> list[str]:
-    return sorted({m.strip() for m in _DEFINED_TERM.findall(text)})
 
 
 # --- Cross-references -----------------------------------------------------------------

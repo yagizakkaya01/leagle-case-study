@@ -50,7 +50,6 @@ def test_process_pdf_keeps_page_numbers_and_reports_empty_pages():
     meta = result.chunks[0].metadata
     assert meta["chunk_id"] == "doc1-p2-c0"
     assert (meta["document_id"], meta["filename"], meta["page"]) == ("doc1", "lease.pdf", 2)
-    assert meta["has_amount"] is True
     assert result.pages[1].startswith("The Tenant")
 
 

@@ -175,3 +175,16 @@ now rebuilt in the shape of a non-streamed reply (regression test in
   series of evaluation runs on one key; the remaining answers were not scored rather than
   counted as wrong. Re-running all three sets is the open item.
 - Same caveats as round 1: small, synthetic, single author, keyword scoring.
+
+## After round 2
+
+Citations changed after this round: a replacement quote keeps the value after its label,
+and a quote moves to the line stating a date or number the answer gives. This came from
+a real document, where the answer gave a date and the quote did not contain it. The change
+touches only the quote, not the answer or the page, and is covered by unit tests.
+
+**It was not measured with the full evaluation.** Two re-runs of all three sets hit the
+rate limit: 7 of 100 attempted answers were scored and all 7 passed, which is too few to
+mean anything. The runner now waits and retries on provider errors instead of spending a
+whole set in seconds, but that version was stopped before finishing a set, so it is
+untested on a full run. Re-running the three sets is still the open item.

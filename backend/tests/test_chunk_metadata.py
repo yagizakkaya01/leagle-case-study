@@ -3,9 +3,6 @@ import pytest
 from app.services.chunk_metadata import (
     case_numbers,
     classify_clause,
-    defined_terms,
-    has_amount,
-    has_date,
     parse_heading,
 )
 
@@ -49,21 +46,6 @@ def test_classify_clause_uses_heading_and_text():
 
 def test_classify_clause_needs_more_than_one_weak_hit():
     assert classify_clause(None, "Please make sure the court is informed.") == "other"
-
-
-def test_amount_and_date_flags():
-    assert has_amount("monthly rent of 5.000 TL")
-    assert has_amount("a fee of €200")
-    assert not has_amount("within 30 days")
-    assert has_date("signed on 12.03.2024")
-    assert has_date("dated 5 Mart 2024")
-    assert has_date("effective March 5, 2024")
-    assert not has_date("Article 12.3")
-
-
-def test_defined_terms():
-    text = 'Acme Ltd (the "Supplier") and Beta (“Kiracı”) agree; see "the annex".'
-    assert defined_terms(text) == ["Kiracı", "Supplier"]
 
 
 def test_case_numbers_turkish_and_english():

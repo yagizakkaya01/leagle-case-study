@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -67,3 +69,10 @@ def test_unknown_file_is_not_found(client):
 
 def test_file_id_must_be_a_content_hash(client):
     assert client.get("/api/documents/not-a-hash/file").status_code == 422
+
+
+def test_rejected_pdf_is_not_kept(client):
+    data = make_pdf(["", ""])
+    assert _upload(client, data).status_code == 422
+    document_id = hashlib.sha256(data).hexdigest()
+    assert client.get(f"/api/documents/{document_id}/file").status_code == 404

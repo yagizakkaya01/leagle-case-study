@@ -55,10 +55,6 @@ class SearchIndex:
                             exc_info=True)
                 self._vectors = None
 
-    @property
-    def semantic(self) -> bool:
-        return self._vectors is not None
-
     def search(self, query: str, k: int = 5, where: ChunkFilter | None = None) -> list[Document]:
         if self._bm25 is None:
             return []

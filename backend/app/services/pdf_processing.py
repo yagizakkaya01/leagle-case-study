@@ -15,9 +15,6 @@ from langchain_core.documents import Document
 
 from app.services.chunk_metadata import (
     classify_clause,
-    defined_terms,
-    has_amount,
-    has_date,
     parse_heading,
     referenced_clauses,
 )
@@ -129,9 +126,6 @@ def _chunk_document(
             "section_heading": section.heading,
             "clause_number": section.clause_number,
             "clause_category": classify_clause(section.heading, text),
-            "has_amount": has_amount(text),
-            "has_date": has_date(text),
-            "defined_terms": defined_terms(text),
             "references": referenced_clauses(text, section.clause_number),
         },
     )

@@ -298,6 +298,10 @@ Documents can be confidential, so these lines hold counts and short ids: never t
 the answer, a quote, a filename or a full document id. A traceback can still repeat error
 text returned by the model provider.
 
+This covers the backend's log. The frontend's nginx writes no access log for `/api/`, but
+its error log can still contain a request line, with the full document id, when the backend
+fails or times out.
+
 ## Project structure
 
 ```

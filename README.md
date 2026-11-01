@@ -134,7 +134,8 @@ with `npm run lint` and `npm run build`.
    the upload.
 6. **Search index:** BM25 plus NVIDIA embeddings, merged with reciprocal rank fusion, then
    reordered by an NVIDIA reranker. Keyword search alone works when no embedding model is
-   configured, and a failed or slow rerank call (10 s) keeps the merged order.
+   configured, and a failed rerank call keeps the merged order. A rerank call that hangs
+   can add up to 60 s (the client's default timeout; the reranker class takes no timeout).
 7. The PDF is stored under its sha256 (the same file uploaded twice is processed once).
 
 ### 2. Chat: tool calling with verified citations

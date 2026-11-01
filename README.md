@@ -408,6 +408,8 @@ eval questions, mainly to check that plain factual questions do not become over-
 - A line in capitals at the bottom of a page, such as a `STRICTLY CONFIDENTIAL` footer, is
   taken as a heading. It then replaces the clause heading that carries over to the next
   page, so the text at the top of that page loses its clause heading and number.
+- A wrapped line that starts with a date, such as "15 January 2024 between the parties", is
+  still taken as a numbered heading (clause 15).
 - The evidence viewer has no search or text selection. A quote that cannot be located
   (for example, one made only of symbols) opens its page without a highlight, with the
   quote shown above it.

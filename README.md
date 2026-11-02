@@ -462,13 +462,14 @@ Left out:
 
 ## Where the ideas come from
 
-This project combines pieces I built and learned in earlier work:
+This project combines pieces I built and learned in earlier work. LangChain memory,
+structured output and the React frontend are new here.
 
-| Piece | Earlier project |
-|---|---|
-| Page-aware chunking, chunk quality filter, BM25 + vector search with RRF, chat UI layout | a RAG assistant for company documents |
-| Typed tools instead of free text, "the data is the truth, the narration is convenience", showing tool calls next to the answer, config/logging/compose/CI layout, model evaluation method | a natural-language query system over a PostgreSQL event store |
-| Structured legal metadata, Turkish court case-number patterns, sha256-based de-duplication | indexing Turkish high-court decisions |
+| Earlier project | What it is | What came from it |
+|---|---|---|
+| Çilek AI | RAG assistant for company documents, built for Çilek Mobilya | Page-aware chunking, chunk quality filter, BM25 + vector search with RRF, swappable storage behind one interface, chat UI layout |
+| Kervansaray | Natural-language queries over a PostgreSQL store of car park events | Typed tools instead of free text, "the data is the truth, the narration is convenience", showing tool calls next to the answer, SSE streaming, rate limiting, config/logging/compose/CI layout, model evaluation method |
+| Hammurabi | Indexing Turkish high-court decisions, from a previous job | Ideas only, no code: structured legal metadata, Turkish court case-number patterns, sha256-based de-duplication |
 
 ## Next steps for a legal product
 

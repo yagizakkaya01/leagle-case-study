@@ -28,7 +28,8 @@ def test_box_sits_on_the_text_in_percent_of_the_page():
 
 def test_includes_punctuation_after_the_last_word():
     [box] = locate_quote(make_positioned_pdf(FORM_CELLS), 1, "the warehouse in good condition")
-    [with_dot] = locate_quote(make_positioned_pdf(FORM_CELLS), 1, "the warehouse in good condition.")
+    [with_dot] = locate_quote(make_positioned_pdf(FORM_CELLS), 1,
+                              "the warehouse in good condition.")
     assert box.width == with_dot.width
 
 

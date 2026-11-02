@@ -29,7 +29,7 @@ MAX_QUOTE_CHARS = 600  # legal sentences are long; the highlight should cover th
 UNVERIFIED_ANSWER = (
     "I could not find a passage in the document that supports an answer to this question."
 )
-# No colon: "Discharge date: 31.08.2024" must keep the value that follows its label.
+# No colon: "Due date: 15.03.2026" must keep the value that follows its label.
 # Nor before a digit: "TTK m. 378" stays in one piece.
 _SENTENCE_SPLIT = re.compile(r"(?<=[.;!?])\s+(?![\s\d])|\n+")
 _FACT = re.compile(r"\d[\d.,/-]*\d")  # two digits or more: skips list markers like "(1)"
@@ -71,7 +71,7 @@ def _closest_sentence(chunk_text: str, target: str) -> str:
 
 
 def _facts(text: str) -> set[str]:
-    """Dates and numbers, so that 31/08/2024 and 31.08.2024 compare as the same value."""
+    """Dates and numbers, so that 15/03/2026 and 15.03.2026 compare as the same value."""
     values = _FACT.findall(_LEGAL_REFERENCE.sub(" ", text))
     return {".".join(str(int(n)) for n in re.findall(r"\d+", m)) for m in values}
 

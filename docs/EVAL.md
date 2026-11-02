@@ -185,7 +185,7 @@ now rebuilt in the shape of a non-streamed reply (regression test in
 
 Citations changed after this round: a replacement quote keeps the value after its label,
 and a quote moves to the line stating a date or number the answer gives. This came from
-a real document, where the answer gave a date and the quote did not contain it. The change
+a test document, where the answer gave a date and the quote did not contain it. The change
 touches only the quote, not the answer or the page, and is covered by unit tests.
 
 **It was not measured with the full evaluation.** Two re-runs of all three sets hit the

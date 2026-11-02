@@ -7,6 +7,11 @@ for word in the passage it cites; it does not check that the quote supports the 
 FastAPI + LangChain backend, React frontend, PostgreSQL chat history and Azure Blob
 document storage (Azurite locally).
 
+**Tool calling instead of a fixed retrieval step.** The model is not handed retrieved text
+for every question. It reads the document through typed tools, decides what to look up and
+when it has enough, then gives its answer as a structured tool call that code checks. See
+[how this differs from a typical RAG pipeline](#how-it-works).
+
 **Live demo: <https://leagle.yagizakkaya.com.tr>** — public, so please do not upload
 confidential documents. Uploads and chats are deleted after 24 hours, and questions are
 rate-limited per visitor. The demo runs the same Docker setup as below (PDFs are stored
@@ -101,6 +106,21 @@ with `npm run lint` and `npm run build`.
 ---
 
 ## How it works
+
+The main design choice is how the model reaches the document:
+
+| | Typical RAG pipeline | This project |
+|---|---|---|
+| Who starts a search? | Code, once per question | The model, as many times as it needs (up to 3 tool turns) |
+| How is a search expressed? | The question's text | Typed parameters: query, clause category, page range |
+| What does the model read? | Retrieved chunks placed in the prompt | Only what its tool calls return |
+| Where does the citation come from? | Usually the model's own text | A chunk a tool returned; code takes the page from it and checks the quote against its text |
+| Can you see how it got there? | Usually not | "How this answer was found" lists the tool calls |
+
+This is a design choice, not a measured win: it was not compared against a simpler pipeline,
+and many RAG systems also check their citations. The cost is real. Several model turns are
+slower and use more of the rate limit, and the model decides what to search, so a list such
+as all the risks in a contract can miss clauses.
 
 ```
 ┌──────────── React (Vite) ────────────┐

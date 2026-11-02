@@ -41,7 +41,7 @@ async def lifespan(_: FastAPI):
     stop.set()
 
 
-app = FastAPI(title="Legal Document Chat API", lifespan=lifespan)
+app = FastAPI(title="Leagle Document Chat API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

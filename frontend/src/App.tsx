@@ -71,7 +71,7 @@ export default function App() {
       <header className="app-header">
         <div className="hero-inner">
           <div className="brand">
-            <span className="brand-name">Legal Document Chat</span>
+            <span className="brand-name">Leagle Document Chat</span>
             <span className="brand-sub">Ask questions about your PDF</span>
           </div>
           <h1 className="hero-title">Ask your document. Get the page and the quote.</h1>

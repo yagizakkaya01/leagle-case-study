@@ -1,4 +1,4 @@
-# Legal Document Chat
+# Leagle Document Chat
 
 Upload a PDF, ask questions about it in a conversation, and get answers with the
 **page number** and a **quote** from the document. Code checks that the quote appears word
@@ -223,8 +223,72 @@ would give up the structured output. `final` always comes
 last because verification needs the complete answer, so a streamed but unverified
 answer is replaced in the UI.
 
-## API
+## System diagrams
 
+Models of the system as built: what it does, its main flows, its structure and where it runs. The Mermaid source is in [docs/diagrams/DIAGRAMS.md](docs/diagrams/DIAGRAMS.md).
+
+### Use cases
+
+What can each actor do?
+
+<img src="docs/diagrams/02-use-cases.png" alt="Use cases" width="640">
+
+### Activity: uploading a PDF
+
+What happens to a PDF, and when is it refused?
+
+<img src="docs/diagrams/03-activity-upload.png" alt="Activity: uploading a PDF" width="560">
+
+### Activity: checking a citation
+
+How is a model's answer checked?
+
+<img src="docs/diagrams/04-activity-citation-check.png" alt="Activity: checking a citation" width="480">
+
+### Class diagram: answering a question
+
+Which objects carry the work?
+
+<img src="docs/diagrams/05a-class-answering.png" alt="Class diagram: answering a question" width="100%">
+
+### Class diagram: documents and conversations
+
+Which objects keep the data?
+
+<img src="docs/diagrams/05b-class-documents.png" alt="Class diagram: documents and conversations" width="100%">
+
+### Class diagram: stored data
+
+What survives a restart?
+
+<img src="docs/diagrams/06-class-stored-data.png" alt="Class diagram: stored data" width="100%">
+
+### Sequence: asking a question
+
+Who calls whom during a streamed answer?
+
+<img src="docs/diagrams/07-sequence-ask-question.png" alt="Sequence: asking a question" width="100%">
+
+### Sequence: reopening a conversation
+
+How do a document and its chat come back?
+
+<img src="docs/diagrams/08-sequence-reopen-conversation.png" alt="Sequence: reopening a conversation" width="100%">
+
+### State machine: a question
+
+How does the tool loop end?
+
+<img src="docs/diagrams/10-state-question.png" alt="State machine: a question" width="100%">
+
+### Deployment
+
+What runs where?
+
+<img src="docs/diagrams/13-deployment.png" alt="Deployment" width="100%">
+---
+
+## API
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/documents` | upload a PDF (multipart `file`) → document info + metadata |

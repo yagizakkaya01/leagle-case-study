@@ -24,7 +24,7 @@ in the Azurite emulator on the server).
 | Answer + page number + reference text | ✅ structured output, checked against the document by code |
 | React chat UI showing answer, page and reference | ✅ the page and a one-line quote sit under each answer; "Show evidence" opens the original PDF page with the quote highlighted |
 | **Bonus:** persistent chat history (PostgreSQL via LangChain) | ✅ `PostgresChatMessageHistory`, reloadable from a sidebar |
-| **Bonus:** cloud document storage (Azure Blob) | Azure Blob SDK, tested on Azurite (the emulator); not tried with a real Azure account |
+| **Bonus:** cloud document storage (Azure Blob) | Azure Blob SDK, tested on Azurite (the emulator). I used Azurite because I ran into problems signing up for a Microsoft Azure account, so it has not been tried with a real one |
 | **Bonus:** cloud-backed conversations | ✅ each conversation is bound to its PDF; both reload on click |
 | **Bonus:** streaming responses | Partial: Server-Sent Events show each tool step live; with the default model the answer text arrives in one piece at the end ([details](#4-streaming)) |
 
@@ -467,9 +467,13 @@ The same code runs locally and as a public demo; only configuration differs.
 
 The case discourages over-engineering, and parts of this project go beyond what it asks:
 hybrid search with a reranker and cross-reference linking, the tool-calling loop and the
-evidence viewer that highlights the quote on the PDF page. They were kept because rewriting
-or removing them close to the deadline risked new bugs, not because a comparison showed
-they were needed; no comparison against a simpler design was run.
+evidence viewer that highlights the quote on the PDF page. Most of this builds on my earlier
+projects (see [Where the ideas come from](#where-the-ideas-come-from)): hybrid search and the
+reranker come from Çilek AI, and the tool-calling loop and tying each answer to its source
+from Kervansaray. The PDF viewer and cross-reference linking are new here. They were kept
+because they were familiar choices and because rewriting or removing them close to the
+deadline risked new bugs, not because a comparison showed they were needed; no comparison
+against a simpler design was run.
 
 Left out:
 
@@ -487,8 +491,8 @@ structured output and the React frontend are new here.
 
 | Earlier project | What it is | What came from it |
 |---|---|---|
-| Çilek AI | RAG assistant for company documents, built for Çilek Mobilya | Page-aware chunking, chunk quality filter, BM25 + vector search with RRF, swappable storage behind one interface, chat UI layout |
-| Kervansaray | Natural-language queries over a PostgreSQL store of car park events | Typed tools instead of free text, "the data is the truth, the narration is convenience", showing tool calls next to the answer, SSE streaming, rate limiting, config/logging/compose/CI layout, model evaluation method |
+| Çilek AI | RAG assistant for company documents, built for Çilek Mobilya | Page-aware chunking, chunk quality filter, BM25 + vector search with RRF, reranking, swappable storage behind one interface, chat UI layout |
+| Kervansaray | Natural-language queries over a PostgreSQL store of car park events | Typed tools instead of free text, "the data is the truth, the narration is convenience" (each result traceable to its source), showing tool calls next to the answer, SSE streaming, rate limiting, config/logging/compose/CI layout, model evaluation method |
 | Hammurabi | Indexing Turkish high-court decisions, from a previous job | Ideas only, no code: structured legal metadata, Turkish court case-number patterns, sha256-based de-duplication |
 
 ## Next steps for a legal product

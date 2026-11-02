@@ -405,6 +405,8 @@ frontend/
                             EvidenceViewer, ConversationSidebar, DemoBanner
 docs/MODEL_SELECTION.md     why these models, with live measurements
 docs/EVAL.md                answer-quality evaluation against the real model
+docs/NEXT_STEPS.md          ideas left out of scope
+docs/diagrams/              system diagrams and their Mermaid source
 docker-compose.yml          frontend, backend, PostgreSQL, Azurite
 ```
 
